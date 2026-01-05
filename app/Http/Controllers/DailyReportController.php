@@ -19,22 +19,48 @@ class DailyReportController extends Controller
     {
         $user = $request->user();
 
+        $allowed = ['all', 'draft', 'submitted', 'approved', 'rejected'];
+
+        $status = $request->query('status'); // null / all / draft ...
+        if ($status !== null && !in_array($status, $allowed, true)) {
+            abort(404);
+        }
+
+        // 承認者は「未処理（submitted）」をデフォルト表示にする
+        if ($user->canApprove() && $status === null) {
+            $status = 'submitted';
+        }
+
         $query = DailyReport::query()->with('user');
 
         if (! $user->canApprove()) {
             $query->where('user_id', $user->id);
-        } else {
-            if ($request->filled('status')) {
-                $query->where('status', $request->string('status'));
-            }
+        }
+
+        if ($status && $status !== 'all') {
+            $query->where('status', $status);
         }
 
         $reports = $query
             ->orderByDesc('report_date')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
-        return view('reports.index', compact('reports'));
+        // 件数（承認者は全体、一般は自分の分）
+        $countBase = DailyReport::query();
+        if (! $user->canApprove()) {
+            $countBase->where('user_id', $user->id);
         }
+
+        $counts = (clone $countBase)
+            ->selectRaw('status, COUNT(*) as c')
+            ->groupBy('status')
+            ->pluck('c', 'status');
+
+        $totalCount = (clone $countBase)->count();
+
+        return view('reports.index', compact('reports', 'status', 'counts', 'totalCount'));
+    }
 
     /**
      * Show the form for creating a new resource.
@@ -88,11 +114,27 @@ class DailyReportController extends Controller
      */
     public function edit(Request $request, DailyReport $report)
     {
-        $this->authorize('update', $report);
+        // そもそも見れない日報なら隠す（情報漏えい防止
+        if (! $request->user()->can('view', $report)) {
+            abort(404);
+        }
+
+        // 見れるが編集できない（= 状態による）場合は案内して詳細へ戻す
+        if (! $request->user()->can('update', $report)) {
+            $msg = match ($report->status) {
+                'submitted' => 'この日報は提出済みのため編集できません。',
+                'approved'  => 'この日報は承認済みのため編集できません。',
+                default     => 'この日報は編集できません。',
+            };
+
+            return redirect()
+                ->route('reports.show', $report)
+                ->with('error', $msg);
+        }
 
         $report->load(['timeEntries.project']);
 
-        $projects = Project::query()
+        $projects = \App\Models\Project::query()
             ->where('user_id', $request->user()->id)
             ->where('status', 'active')
             ->orderBy('name')
@@ -106,7 +148,22 @@ class DailyReportController extends Controller
      */
     public function update(Request $request, DailyReport $report)
     {
-        $this->authorize('update', $report);
+        if (! $request->user()->can('view', $report)) {
+            abort(404);
+        }
+        if (! $request->user()->can('update', $report)) {
+            $msg = match ($report->status) {
+                'submitted' => 'この日報は提出済みのため編集できません。',
+                'approved'  => 'この日報は承認済みのため編集できません。',
+                default     => 'この日報は編集できません。',
+            };
+
+            return redirect()
+                ->route('reports.show', $report)
+                ->with('error', $msg);
+        }
+
+        // $this->authorize('update', $report);
 
         $data = $this->validatedForUpdate($request);
 
@@ -153,6 +210,7 @@ class DailyReportController extends Controller
         }
 
         $dailyReport->status = 'submitted';
+        $dailyReport->rejection_reason = null;
         $dailyReport->submitted_at = now();
         $dailyReport->approved_at = null;
         $dailyReport->approved_by = null;
@@ -168,12 +226,13 @@ class DailyReportController extends Controller
         $this->authorize('approve', $dailyReport);
 
         $dailyReport->status = 'approved';
+        $dailyReport->rejection_reason = null;
         $dailyReport->approved_at = now();
         $dailyReport->approved_by = $request->user()->id;
         $dailyReport->save();
 
         return redirect()
-            ->route('reports.show', $dailyReport)
+            ->route('reports.index', ['status' => 'submitted'])
             ->with('success', '日報を承認しました。');
     }
 
@@ -181,13 +240,19 @@ class DailyReportController extends Controller
     {
         $this->authorize('reject', $dailyReport);
 
+        
+        $data = $request->validate([
+            'rejection_reason' => ['required', 'string', 'max:1000'],
+        ]);
+
         $dailyReport->status = 'rejected';
+        $dailyReport->rejection_reason = $data['rejection_reason'];
         $dailyReport->approved_at = now();            // 「確認した日時」として使う（簡易）
         $dailyReport->approved_by = $request->user()->id; // 「差戻しした人」
         $dailyReport->save();
 
         return redirect()
-            ->route('reports.show', $dailyReport)
+            ->route('reports.index', ['status' => 'submitted'])
             ->with('success', '日報を差戻ししました。');
     }
 

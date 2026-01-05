@@ -9,6 +9,13 @@
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
+                    @if($report->status === 'rejected' && $report->rejection_reason)
+                        <div class="mb-6 p-4 border border-red-200 bg-red-50 rounded-lg">
+                            <div class="text-sm font-semibold text-red-700">差戻し理由</div>
+                            <div class="mt-2 whitespace-pre-wrap text-red-900">{{ $report->rejection_reason }}</div>
+                        </div>
+                    @endif
+
                     {{-- 更新フォーム（入力欄だけを囲う） --}}
                     <form id="report-update-form" method="POST" action="{{ route('reports.update', $report) }}">
                         @csrf

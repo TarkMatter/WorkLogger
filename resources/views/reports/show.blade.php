@@ -138,32 +138,141 @@
 
                     @can('approve', $report)
                         @if($report->status === 'submitted')
-                            <div class="mt-4 p-4 border rounded-lg space-y-3">
+                            @php
+                                $total = (int) $report->timeEntries->sum('minutes');
+                                $hours = intdiv($total, 60);
+                                $mins  = $total % 60;
+
+                                $warnZero = ($total === 0);
+                                $warnOver = ($total > 24 * 60);
+
+                                // 警告があるなら承認はUIでも無効化（サーバ側でも弾いてる）
+                                $approveDisabled = ($warnZero || $warnOver);
+
+                                $approveDisabledReason = $warnZero
+                                    ? '工数が0分のため承認できません（未入力の可能性）。'
+                                    : ($warnOver ? '合計工数が24時間を超えているため承認できません（異常値の可能性）。' : null);
+
+                                // 差戻しフォームを開いた状態にしたい条件
+                                $openReject = old('rejection_reason') || $errors->has('rejection_reason') || $warnZero || $warnOver;
+
+                                // 差戻し理由が空（trim後に空）なら差戻しボタン無効
+                                $initialReason = (string) old('rejection_reason', '');
+                                $rejectDisabled = trim($initialReason) === '';
+                                $initialCounter = mb_strlen($initialReason);
+                            @endphp
+
+                            <div id="approval-panel" class="mt-4 p-4 border rounded-lg space-y-3">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
                                         <div class="text-sm text-gray-500">承認操作</div>
                                         <div class="font-semibold">この日報は提出済みです</div>
-                                        <div class="text-sm text-gray-500 mt-1">
-                                            承認するか、理由を添えて差戻しできます。
+
+                                        <div class="mt-1 text-sm text-gray-600">
+                                            合計工数：<span class="font-semibold">{{ $hours }}h {{ $mins }}m</span>（{{ $total }}分）
                                         </div>
+
+                                        @if($warnZero || $warnOver)
+                                            <div class="mt-2 flex flex-wrap gap-2">
+                                                @if($warnZero)
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs border bg-red-50 text-red-800 border-red-200">
+                                                        ⚠ 工数0（未入力の可能性）
+                                                    </span>
+                                                @endif
+                                                @if($warnOver)
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs border bg-amber-50 text-amber-900 border-amber-200">
+                                                        ⚠ 24h超（異常値の可能性）
+                                                    </span>
+                                                @endif
+                                            </div>
+
+                                            <div class="mt-2 text-sm text-gray-700">
+                                                {{ $approveDisabledReason }}
+                                                差戻しで修正依頼するのがおすすめです。
+                                            </div>
+                                        @else
+                                            <div class="mt-2 text-sm text-gray-500">
+                                                承認するか、理由を添えて差戻しできます。
+                                            </div>
+                                        @endif
                                     </div>
 
-                                    {{-- 承認ボタンは目立たせて右上 --}}
+                                    {{-- 承認ボタン（警告があるときは無効化） --}}
                                     <form method="POST"
                                         action="{{ route('reports.approve', ['dailyReport' => $report]) }}"
-                                        onsubmit="return confirm('この日報を承認します。よろしいですか？');">
+                                        onsubmit="return {{ $approveDisabled ? 'false' : "confirm('この日報を承認します。よろしいですか？')" }};">
                                         @csrf
-                                        <x-primary-button>承認</x-primary-button>
+
+                                        <button type="submit"
+                                                class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                {{ $approveDisabled ? 'disabled' : '' }}
+                                                title="{{ $approveDisabled ? $approveDisabledReason : '' }}">
+                                            承認
+                                        </button>
+
+                                        @if($approveDisabled)
+                                            <div class="mt-2 text-xs text-gray-500 text-right">
+                                                ※ 警告があるため承認は無効です
+                                            </div>
+                                        @endif
                                     </form>
                                 </div>
 
-                                {{-- 差戻しは折りたたみ：必要なときだけ開く --}}
-                                <details class="border rounded-md">
+                                {{-- 差戻し --}}
+                                <details class="border rounded-md" @if($openReject) open @endif>
                                     <summary class="cursor-pointer select-none px-3 py-2 text-sm font-semibold">
                                         差戻し（理由必須）
                                     </summary>
 
-                                    <div class="px-3 pb-3 pt-2 space-y-2">
+                                    <div class="px-3 pb-3 pt-2 space-y-3">
+
+                                        {{-- テンプレ（よくある指摘） --}}
+                                        <div class="p-3 border rounded-md bg-gray-50">
+                                            <div class="text-xs font-semibold text-gray-600 mb-2">よくある指摘（クリックで追記）</div>
+
+                                            <div class="flex flex-wrap gap-2">
+                                                <button type="button"
+                                                        class="tpl-btn inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm"
+                                                        data-text="工数の内訳が不明確です。各行の「作業内容」をもう少し具体的に追記してください。">
+                                                    内訳が不明確
+                                                </button>
+
+                                                <button type="button"
+                                                        class="tpl-btn inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm"
+                                                        data-text="案件の選択が誤っている可能性があります。正しい案件に付け替えて再提出してください。">
+                                                    案件が違う
+                                                </button>
+
+                                                <button type="button"
+                                                        class="tpl-btn inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm"
+                                                        data-text="合計工数が24時間を超えています。入力ミスがないか確認して修正してください。">
+                                                    24h超
+                                                </button>
+
+                                                <button type="button"
+                                                        class="tpl-btn inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm"
+                                                        data-text="メモが不足しています。背景／判断理由／成果（何ができたか）を追記してください。">
+                                                    メモ不足
+                                                </button>
+
+                                                <button type="button"
+                                                        class="tpl-btn inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm"
+                                                        data-text="工数が0分になっています。工数の入力を確認して再提出してください。">
+                                                    工数0
+                                                </button>
+
+                                                <button type="button"
+                                                        id="tpl-clear"
+                                                        class="inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm text-gray-700">
+                                                    クリア
+                                                </button>
+                                            </div>
+
+                                            <div class="mt-2 text-xs text-gray-500">
+                                                ※ 既に入力がある場合は末尾に追記します（誤って消さないため）
+                                            </div>
+                                        </div>
+
                                         <form method="POST"
                                             action="{{ route('reports.reject', ['dailyReport' => $report]) }}"
                                             class="space-y-2"
@@ -171,15 +280,28 @@
                                             @csrf
 
                                             <div>
-                                                <x-input-label for="rejection_reason" value="差戻し理由（必須 / 1000文字以内）" />
+                                                <label for="rejection_reason" class="text-sm font-semibold text-gray-700">
+                                                    差戻し理由（必須 / 1000文字以内）
+                                                </label>
+
                                                 <textarea id="rejection_reason"
                                                         name="rejection_reason"
                                                         required
                                                         maxlength="1000"
                                                         class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                                                        rows="4"
-                                                        placeholder="例：案件PJ-001の工数内訳が不明確です。作業内容を追記してください。">{{ old('rejection_reason') }}</textarea>
-                                                <x-input-error :messages="$errors->get('rejection_reason')" class="mt-2" />
+                                                        rows="5"
+                                                        placeholder="例：工数の内訳が不明確です。作業内容を追記してください。">{{ $initialReason }}</textarea>
+
+                                                <div class="mt-1 flex items-center justify-between text-xs text-gray-500">
+                                                    <span id="reject-hint">※ 空（空白のみ）は送信できません</span>
+                                                    <span id="rejection-counter">{{ $initialCounter }}/1000</span>
+                                                </div>
+
+                                                @if($errors->has('rejection_reason'))
+                                                    <div class="mt-2 text-sm text-red-600">
+                                                        {{ $errors->first('rejection_reason') }}
+                                                    </div>
+                                                @endif
                                             </div>
 
                                             <div class="flex items-center justify-end gap-2">
@@ -187,14 +309,71 @@
                                                 onclick="this.closest('details').removeAttribute('open'); return false;">
                                                     閉じる
                                                 </a>
-                                                <x-danger-button>差戻し</x-danger-button>
+
+                                                <button type="submit"
+                                                        id="reject-button"
+                                                        class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        {{ $rejectDisabled ? 'disabled' : '' }}
+                                                        title="{{ $rejectDisabled ? '差戻し理由を入力してください（空白のみは不可）' : '' }}">
+                                                    差戻し
+                                                </button>
                                             </div>
                                         </form>
                                     </div>
                                 </details>
                             </div>
+
+                            <script>
+                                document.addEventListener('DOMContentLoaded', () => {
+                                    const textarea = document.getElementById('rejection_reason');
+                                    const rejectBtn = document.getElementById('reject-button');
+                                    const counter = document.getElementById('rejection-counter');
+                                    const clearBtn = document.getElementById('tpl-clear');
+
+                                    if (!textarea || !rejectBtn) return;
+
+                                    const update = () => {
+                                        const raw = textarea.value ?? '';
+                                        const trimmed = raw.trim();
+
+                                        const ok = trimmed.length > 0;
+
+                                        rejectBtn.disabled = !ok;
+                                        rejectBtn.title = ok ? '' : '差戻し理由を入力してください（空白のみは不可）';
+
+                                        if (counter) counter.textContent = `${raw.length}/1000`;
+                                    };
+
+                                    const appendTemplate = (text) => {
+                                        const raw = textarea.value ?? '';
+                                        const next = raw.trim().length > 0 ? (raw.replace(/\s*$/, '') + "\n" + text) : text;
+                                        textarea.value = next;
+                                        textarea.focus();
+                                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                                    };
+
+                                    document.querySelectorAll('.tpl-btn').forEach((btn) => {
+                                        btn.addEventListener('click', () => {
+                                            const text = btn.getAttribute('data-text') || '';
+                                            if (text) appendTemplate(text);
+                                        });
+                                    });
+
+                                    if (clearBtn) {
+                                        clearBtn.addEventListener('click', () => {
+                                            textarea.value = '';
+                                            textarea.focus();
+                                            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                                        });
+                                    }
+
+                                    textarea.addEventListener('input', update);
+                                    update();
+                                });
+                            </script>
                         @endif
                     @endcan
+
 
 
                     @if($report->approved_by)

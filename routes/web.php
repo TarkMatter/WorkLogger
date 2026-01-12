@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use \App\Http\Controllers\ProjectController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -18,7 +19,38 @@ Route::middleware('auth')->group(function () {
 
     // --------------------------------------------------
     //　案件のCRUD
-    Route::resource('projects', \App\Http\Controllers\ProjectController::class);
+
+    Route::middleware(['auth'])->group(function () {
+
+        // 一覧
+        Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
+
+        // adminのみ（作成）
+        Route::middleware('can:create,App\Models\Project')->group(function () {
+            Route::get('/projects/create', [ProjectController::class, 'create'])->name('projects.create');
+            Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
+        });
+
+        // adminのみ（編集）
+        Route::middleware('can:update,project')->group(function () {
+            Route::get('/projects/{project}/edit', [ProjectController::class, 'edit'])->name('projects.edit');
+            Route::put('/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
+        });
+
+        // adminのみ（削除）
+        Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])
+            ->middleware('can:delete,project')
+            ->name('projects.destroy');
+
+        // 詳細（← これが最後！）
+        Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+    });
+
+    // Route::middleware(['auth'])->group(function () {
+    //     Route::resource('projects', \App\Http\Controllers\ProjectController::class);
+    // });
+
+    // Route::resource('projects', \App\Http\Controllers\ProjectController::class);
 
     // --------------------------------------------------
     // 日報のCRUD

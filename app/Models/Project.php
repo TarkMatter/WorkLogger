@@ -6,18 +6,19 @@ use Illuminate\Database\Eloquent\Model;
 
 class Project extends Model
 {
+    // protected $fillable =['name', 'description'];
     protected $fillable = [
         'name',
         'code',
         'status',
-        'starts_on',
-        'ends_on',
+        'start_date',
+        'end_date',
         'description',
     ];
 
     protected $casts = [
-        'starts_on' => 'date',
-        'ends_on' => 'date',
+        'start_date' => 'date',
+        'end_date' => 'date',
     ];
     
     public function user()

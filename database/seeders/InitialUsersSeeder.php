@@ -27,5 +27,14 @@ class InitialUsersSeeder extends Seeder
                 'role' => 'approver',
             ]
         );
+
+        User::updateOrCreate(
+            ['email' => 'member@example.com'],
+            [
+                'name' => 'member',
+                'password' => Hash::make('password'),
+                'role' => 'member',
+            ]
+        );
     }
 }

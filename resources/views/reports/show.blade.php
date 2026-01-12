@@ -106,7 +106,7 @@
 
                     @if($report->status === 'rejected' && $report->rejection_reason)
                         <div class="mb-4 p-4 border border-red-200 bg-red-50 rounded-lg">
-                            <div class="text-sm font-semibold text-red-700">差戻し理由</div>
+                            <div class="text-sm font-semibold text-red-700">差戻し理由（最新）</div>
                             <div class="mt-2 whitespace-pre-wrap text-red-900">{{ $report->rejection_reason }}</div>
 
                             @can('update', $report)
@@ -119,6 +119,65 @@
                             @endcan
                         </div>
                     @endif
+
+                    <div class="mb-4 p-4 border rounded-lg">
+                        <div class="text-sm text-gray-500">履歴</div>
+
+                        @php
+                            $statusLabel2 = fn($s) => match($s) {
+                                'draft' => '下書き',
+                                'submitted' => '提出済み',
+                                'approved' => '承認済み',
+                                'rejected' => '差戻し',
+                                default => $s,
+                            };
+
+                            $actionLabel = fn($a) => match($a) {
+                                'created' => '作成',
+                                'submitted' => '提出',
+                                'approved' => '承認',
+                                'rejected' => '差戻し',
+                                default => $a,
+                            };
+                        @endphp
+
+                        @if($report->statusLogs->count() === 0)
+                            <div class="mt-2 text-sm text-gray-500">履歴はまだありません。</div>
+                        @else
+                            <div class="mt-3 space-y-3">
+                                @foreach($report->statusLogs as $log)
+                                    <div class="p-3 border rounded-md">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div class="text-sm">
+                                                <span class="font-semibold">{{ $actionLabel($log->action) }}</span>
+                                                <span class="text-gray-500">by</span>
+                                                <span class="font-semibold">{{ $log->actor->name ?? 'Unknown' }}</span>
+
+                                                @if($log->from_status || $log->to_status)
+                                                    <div class="text-gray-600 mt-1">
+                                                        {{ $statusLabel2($log->from_status ?? '-') }}
+                                                        <span class="mx-1">→</span>
+                                                        {{ $statusLabel2($log->to_status ?? '-') }}
+                                                    </div>
+                                                @endif
+                                            </div>
+
+                                            <div class="text-xs text-gray-500">
+                                                {{ $log->created_at->format('Y-m-d H:i') }}
+                                            </div>
+                                        </div>
+
+                                        @if($log->reason)
+                                            <div class="mt-2 text-sm">
+                                                <div class="text-xs font-semibold text-gray-500">理由</div>
+                                                <div class="mt-1 whitespace-pre-wrap">{{ $log->reason }}</div>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
 
 
                     <div>
@@ -401,13 +460,6 @@
                         <div class="whitespace-pre-wrap">{{ $report->memo ?? '-' }}</div>
                     </div>
 
-                    @if($report->status === 'rejected' && $report->rejection_reason)
-                        <div class="p-3 border rounded-md">
-                            <div class="text-sm text-gray-500">差戻し理由</div>
-                            <div class="whitespace-pre-wrap font-semibold">{{ $report->rejection_reason }}</div>
-                        </div>
-                    @endif
-
 
                     <hr class="my-6">
                     @php
@@ -455,10 +507,6 @@
                         <a href="{{ route('reports.index') }}" class="inline-flex items-center px-4 py-2 border rounded-md">
                             一覧へ
                         </a>
-                    </div>
-
-                    <div class="text-sm text-gray-500">
-                        工数の表示は次のステップで追加します。
                     </div>
                 </div>
             </div>

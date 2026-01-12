@@ -32,31 +32,34 @@ class TimeEntryController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request, DailyReport $dailyReport)
+    public function store(\Illuminate\Http\Request $request, \App\Models\DailyReport $dailyReport)
     {
-        // 日報を編集できる人だけ＝本人かつ draft/rejected（Policy）
+        // 日報の編集権限がある人だけが工数を追加できる
         $this->authorize('update', $dailyReport);
 
         $data = $request->validate([
             'project_id' => [
                 'required',
                 'integer',
-                // 自分の案件しか選べない
-                Rule::exists('projects', 'id')->where(fn ($q) => $q->where('user_id', $request->user()->id)),
+                // projects は全体共有：user_idで絞らない
+                \Illuminate\Validation\Rule::exists('projects', 'id'),
             ],
+            'minutes' => ['required', 'integer', 'min:0', 'max:1440'],
             'task' => ['nullable', 'string', 'max:255'],
-            'minutes' => ['required', 'integer', 'min:1', 'max:' . (24 * 60)],
         ]);
 
-        $entry = new TimeEntry();
-        $entry->project_id = $data['project_id'];
-        $entry->task = $data['task'] ?? null;
-        $entry->minutes = $data['minutes'];
+        $entry = new \App\Models\TimeEntry();
         $entry->dailyReport()->associate($dailyReport);
+        $entry->project_id = $data['project_id'];
+        $entry->minutes = $data['minutes'];
+        $entry->task = $data['task'] ?? null;
         $entry->save();
 
-        return redirect()->route('reports.edit', $dailyReport);
+        return redirect()
+            ->route('reports.edit', $dailyReport)
+            ->with('success', '工数を追加しました。');
     }
+
 
     /**
      * Display the specified resource.

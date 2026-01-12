@@ -16,7 +16,7 @@ class DailyReportController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index(\Illuminate\Http\Request $request)
     {
         $user = $request->user();
 
@@ -40,39 +40,49 @@ class DailyReportController extends Controller
         $sort = $request->query('sort', 'report_date');
         $dir  = $request->query('dir', 'desc');
 
-        if (!in_array($sort, $allowedSort, true)) {
-            abort(404);
-        }
-        if (!in_array($dir, ['asc', 'desc'], true)) {
-            abort(404);
+        if (!in_array($sort, $allowedSort, true)) abort(404);
+        if (!in_array($dir, ['asc', 'desc'], true)) abort(404);
+
+        // --- 警告フィルタ（承認者 + submitted のときだけ有効） ---
+        $warn = $request->query('warn', 'all'); // all | warnings
+        if (!in_array($warn, ['all', 'warnings'], true)) abort(404);
+        if (!($user->canApprove() && $status === 'submitted')) {
+            // submitted以外ではwarnは意味がないので常にall扱い
+            $warn = 'all';
         }
 
-        $query = DailyReport::query()
+        $warnSql = "COALESCE((SELECT SUM(minutes) FROM time_entries WHERE time_entries.daily_report_id = daily_reports.id), 0)";
+        $warnLimit = 24 * 60;
+
+        $query = \App\Models\DailyReport::query()
             ->with('user')
-            // 一覧用：合計工数をサブクエリで取得（N+1回避）
             ->withSum('timeEntries as total_minutes', 'minutes');
 
+        // 承認者でない場合は自分の分だけ
         if (! $user->canApprove()) {
             $query->where('user_id', $user->id);
         }
 
+        // ステータス絞り込み
         if ($status && $status !== 'all') {
             $query->where('status', $status);
         }
 
+        // 警告のみ絞り込み（submitted一覧でだけ）
+        if ($warn === 'warnings') {
+            $query->whereRaw("{$warnSql} = 0 OR {$warnSql} > ?", [$warnLimit]);
+        }
+
         // ソート適用（同値のときの安定ソートも付ける）
         if ($sort === 'report_date') {
-            $query->orderBy('report_date', $dir)
-                ->orderBy('id', $dir);
+            $query->orderBy('report_date', $dir)->orderBy('id', $dir);
         } elseif ($sort === 'total_minutes') {
-            // null対策：COALESCE
             $query->orderByRaw('COALESCE(total_minutes, 0) ' . $dir)
                 ->orderBy('report_date', 'desc')
                 ->orderBy('id', 'desc');
         } elseif ($sort === 'user_name') {
-            // joinなしでユーザー名でソート（サブクエリ）
             $query->orderBy(
-                    User::select('name')
+                    \App\Models\User::select('name')
                         ->whereColumn('users.id', 'daily_reports.user_id'),
                     $dir
                 )
@@ -97,62 +107,89 @@ class DailyReportController extends Controller
 
         $totalCount = (clone $countBase)->count();
 
-        return view('reports.index', compact('reports', 'status', 'counts', 'totalCount', 'sort', 'dir'));
+        // 承認待ちの警告件数（承認者のみ表示用）
+        $warningCount = 0;
+        if ($user->canApprove()) {
+            $warningCount = \App\Models\DailyReport::query()
+                ->where('status', 'submitted')
+                ->whereRaw("{$warnSql} = 0 OR {$warnSql} > ?", [$warnLimit])
+                ->count();
+        }
+
+        return view('reports.index', compact(
+            'reports',
+            'status',
+            'counts',
+            'totalCount',
+            'sort',
+            'dir',
+            'warn',
+            'warningCount'
+        ));
     }
-
-
 
     /**
      * Show the form for creating a new resource.
      */
     public function create()
     {
-        return view('reports.create');
+        $projects = \App\Models\Project::query()
+            ->orderBy('name')
+            ->get();
+
+        return view('reports.create', compact('projects'));
     }
+
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(\Illuminate\Http\Request $request)
     {
-        $data = $this->validatedForCreate($request);
-        $user = $request->user();
+        $data = $request->validate([
+            'report_date' => [
+                'required',
+                'date',
+                \Illuminate\Validation\Rule::unique('daily_reports', 'report_date')
+                    ->where(fn ($q) => $q->where('user_id', $request->user()->id)),
+            ],
+            'memo' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'report_date.unique' => 'この日付の日報は既に作成されています。',
+        ]);
 
-        $existing = DailyReport::query()
-            ->where('user_id', $user->id)
-            ->whereDate('report_date', $data['report_date'])
-            ->first();
-
-        if ($existing) {
-            return redirect()->route('reports.edit', $existing);
-        }
-
-        $report = new DailyReport();
+        $report = new \App\Models\DailyReport();
         $report->report_date = $data['report_date'];
-        $report->status = 'draft';
         $report->memo = $data['memo'] ?? null;
-        $report->user()->associate($user);
+        $report->status = 'draft';
+        $report->user()->associate($request->user());
         $report->save();
 
-        return redirect()->route('reports.edit', $report);
+        return redirect()
+            ->route('reports.edit', $report)
+            ->with('success', '日報を作成しました。');
     }
+
+
 
     /**
      * Display the specified resource.
      */
-    public function show(Request $request, DailyReport $report)
+    public function show(\Illuminate\Http\Request $request, \App\Models\DailyReport $report)
     {
         $this->authorize('view', $report);
 
-        $report->load(['user', 'timeEntries.project']);
+        $report->load(['user', 'timeEntries.project', 'approver', 'statusLogs.actor']);
 
-        $prevSubmitted = null; // より新しい（キュー上で前）
-        $nextSubmitted = null; // より古い（キュー上で次）
+        $prevSubmitted = null;
+        $nextSubmitted = null;
 
-        if ($request->user()->canApprove() && $report->status === 'submitted') {
-            // 前（newer）：report_date が大きい、または同日で id が大きいもののうち、直近
+        if ($request->user()->can('approve', $report)) {
+            $actorId = $request->user()->id;
+
             $prevSubmitted = \App\Models\DailyReport::query()
                 ->where('status', 'submitted')
+                ->where('user_id', '!=', $actorId)
                 ->where(function ($q) use ($report) {
                     $q->where('report_date', '>', $report->report_date)
                     ->orWhere(function ($q2) use ($report) {
@@ -164,9 +201,9 @@ class DailyReportController extends Controller
                 ->orderBy('id')
                 ->first();
 
-            // 次（older）：report_date が小さい、または同日で id が小さいもののうち、直近
             $nextSubmitted = \App\Models\DailyReport::query()
                 ->where('status', 'submitted')
+                ->where('user_id', '!=', $actorId)
                 ->where(function ($q) use ($report) {
                     $q->where('report_date', '<', $report->report_date)
                     ->orWhere(function ($q2) use ($report) {
@@ -180,7 +217,6 @@ class DailyReportController extends Controller
         }
 
         return view('reports.show', compact('report', 'prevSubmitted', 'nextSubmitted'));
-
     }
 
     /**
@@ -188,7 +224,7 @@ class DailyReportController extends Controller
      */
     public function edit(Request $request, DailyReport $report)
     {
-        // そもそも見れない日報なら隠す（情報漏えい防止
+        // そもそも見れない日報なら隠す（情報漏えい防止）
         if (! $request->user()->can('view', $report)) {
             abort(404);
         }
@@ -208,14 +244,14 @@ class DailyReportController extends Controller
 
         $report->load(['timeEntries.project']);
 
+        // ✅ projects は全体共有：user_id でも status でも絞らない
         $projects = \App\Models\Project::query()
-            ->where('user_id', $request->user()->id)
-            ->where('status', 'active')
             ->orderBy('name')
             ->get();
 
         return view('reports.edit', compact('report', 'projects'));
     }
+
 
     /**
      * Update the specified resource in storage.
@@ -264,31 +300,33 @@ class DailyReportController extends Controller
      *
      * @param DailyReport $dailyReport 日報
      */
-    public function submit(Request $request, DailyReport $dailyReport)
+    public function submit(\Illuminate\Http\Request $request, \App\Models\DailyReport $dailyReport)
     {
-        $this->authorize('submit', $dailyReport);
+        $this->authorize('update', $dailyReport);
 
-        // ついでに「工数0で提出」を防ぐ（不要ならこのifを消してOK）
-        $totalMinutes = $dailyReport->timeEntries()->sum('minutes');
-        if ($totalMinutes <= 0) {
-            return back()->withErrors([
-                'minutes' => '工数が0分のため提出できません。工数を追加してください。',
-            ]);
+        if (!in_array($dailyReport->status, ['draft', 'rejected'], true)) {
+            return redirect()
+                ->route('reports.show', $dailyReport)
+                ->with('error', '下書き/差戻しの日報のみ提出できます。');
         }
 
-        // 1日24h超え防止（これも不要なら消してOK）
-        if ($totalMinutes > 24 * 60) {
-            return back()->withErrors([
-                'minutes' => '合計工数が24時間を超えています。見直してください。',
-            ]);
-        }
+        $from = $dailyReport->status;
 
         $dailyReport->status = 'submitted';
-        $dailyReport->rejection_reason = null;
         $dailyReport->submitted_at = now();
-        $dailyReport->approved_at = null;
-        $dailyReport->approved_by = null;
         $dailyReport->save();
+
+        $totalMinutes = (int) $dailyReport->timeEntries()->sum('minutes');
+
+        $this->logStatusChange(
+            $dailyReport,
+            $request->user()->id,
+            'submitted',
+            $from,
+            'submitted',
+            null,
+            ['total_minutes' => $totalMinutes]
+        );
 
         return redirect()
             ->route('reports.show', $dailyReport)
@@ -297,56 +335,98 @@ class DailyReportController extends Controller
 
     public function approve(\Illuminate\Http\Request $request, \App\Models\DailyReport $dailyReport)
     {
+        // 自分の日報は承認不可（メッセージで戻す）
+        if ((int) $dailyReport->user_id === (int) $request->user()->id) {
+            return redirect()
+                ->route('reports.show', $dailyReport)
+                ->with('error', '自分の日報は承認できません。');
+        }
+
         $this->authorize('approve', $dailyReport);
 
-        // --- サーバ側チェック（提出済み日報の工数が異常なら承認できない） ---
+        if ($dailyReport->status !== 'submitted') {
+            return redirect()
+                ->route('reports.show', $dailyReport)
+                ->with('error', '提出済みの日報のみ承認できます。');
+        }
+
         $totalMinutes = (int) $dailyReport->timeEntries()->sum('minutes');
 
         if ($totalMinutes <= 0) {
             return redirect()
                 ->to(route('reports.show', $dailyReport) . '#approval-panel')
-                ->with('error', '工数が0分のため承認できません。工数の未入力が疑われるため、差戻ししてください。');
+                ->with('error', '工数が0分のため承認できません。差戻ししてください。');
         }
 
         if ($totalMinutes > 24 * 60) {
             return redirect()
                 ->to(route('reports.show', $dailyReport) . '#approval-panel')
-                ->with('error', '合計工数が24時間を超えているため承認できません。内容を確認して差戻ししてください。');
+                ->with('error', '合計工数が24時間を超えているため承認できません。差戻ししてください。');
         }
 
-        // --- 承認処理 ---
+        $from = $dailyReport->status;
+
         $dailyReport->status = 'approved';
         $dailyReport->rejection_reason = null;
         $dailyReport->approved_at = now();
         $dailyReport->approved_by = $request->user()->id;
         $dailyReport->save();
 
-        // 次の承認待ちへ（あなたの実装済みヘルパー）
-        return $this->redirectToNextSubmitted($dailyReport, '日報を承認しました。');
+        $this->logStatusChange(
+            $dailyReport,
+            $request->user()->id,
+            'approved',
+            $from,
+            'approved',
+            null,
+            ['total_minutes' => $totalMinutes]
+        );
+
+        return $this->redirectToNextSubmitted($dailyReport, $request->user()->id, '日報を承認しました。');
     }
 
-
-    public function reject(Request $request, DailyReport $dailyReport)
+    public function reject(\Illuminate\Http\Request $request, \App\Models\DailyReport $dailyReport)
     {
-        $this->authorize('reject', $dailyReport);
+        if ((int) $dailyReport->user_id === (int) $request->user()->id) {
+            return redirect()
+                ->route('reports.show', $dailyReport)
+                ->with('error', '自分の日報は差戻しできません。');
+        }
 
-        
+        $this->authorize('approve', $dailyReport);
+
+        if ($dailyReport->status !== 'submitted') {
+            return redirect()
+                ->route('reports.show', $dailyReport)
+                ->with('error', '提出済みの日報のみ差戻しできます。');
+        }
+
         $data = $request->validate([
             'rejection_reason' => ['required', 'string', 'max:1000'],
         ]);
 
+        $from = $dailyReport->status;
+
         $dailyReport->status = 'rejected';
         $dailyReport->rejection_reason = $data['rejection_reason'];
-        $dailyReport->approved_at = now();            // 「確認した日時」として使う（簡易）
-        $dailyReport->approved_by = $request->user()->id; // 「差戻しした人」
+        $dailyReport->approved_at = now();
+        $dailyReport->approved_by = $request->user()->id;
         $dailyReport->save();
 
-        // return redirect()
-        //     ->route('reports.index', ['status' => 'submitted'])
-        //     ->with('success', '日報を差戻ししました。');
-        return $this->redirectToNextSubmitted($dailyReport, '日報を差戻ししました。');
-    }
+        $totalMinutes = (int) $dailyReport->timeEntries()->sum('minutes');
 
+        $this->logStatusChange(
+            $dailyReport,
+            $request->user()->id,
+            'rejected',
+            $from,
+            'rejected',
+            $data['rejection_reason'],
+            ['total_minutes' => $totalMinutes]
+        );
+
+        return $this->redirectToNextSubmitted($dailyReport, $request->user()->id, '日報を差戻ししました。');
+    }
 
 
     private function validatedForCreate(Request $request): array
@@ -364,11 +444,14 @@ class DailyReportController extends Controller
         ]);
     }
 
-    private function redirectToNextSubmitted(\App\Models\DailyReport $from, string $message)
+    private function redirectToNextSubmitted(\App\Models\DailyReport $from, int $actorId, string $message)
     {
-        // 「今の順番の次」＝より古い（desc順で後ろ）
-        $next = \App\Models\DailyReport::query()
+        $base = \App\Models\DailyReport::query()
             ->where('status', 'submitted')
+            ->where('user_id', '!=', $actorId);
+
+        // 「今の順番の次」＝より古い（desc順で後ろ）
+        $next = (clone $base)
             ->where(function ($q) use ($from) {
                 $q->where('report_date', '<', $from->report_date)
                 ->orWhere(function ($q2) use ($from) {
@@ -382,8 +465,7 @@ class DailyReportController extends Controller
 
         // もし次が無ければ、残っている最新へ（ぐるっと回す）
         if (! $next) {
-            $next = \App\Models\DailyReport::query()
-                ->where('status', 'submitted')
+            $next = (clone $base)
                 ->orderByDesc('report_date')
                 ->orderByDesc('id')
                 ->first();
@@ -398,6 +480,26 @@ class DailyReportController extends Controller
         return redirect()
             ->route('reports.index', ['status' => 'submitted'])
             ->with('success', $message . '（承認待ちはもうありません）');
+    }
+
+    private function logStatusChange(
+        \App\Models\DailyReport $report,
+        int $actorId,
+        string $action,
+        ?string $fromStatus,
+        ?string $toStatus,
+        ?string $reason = null,
+        array $meta = []
+    ): void {
+        \App\Models\DailyReportStatusLog::create([
+            'daily_report_id' => $report->id,
+            'actor_id' => $actorId,
+            'action' => $action,
+            'from_status' => $fromStatus,
+            'to_status' => $toStatus,
+            'reason' => $reason,
+            'meta' => $meta ?: null,
+        ]);
     }
 
 }

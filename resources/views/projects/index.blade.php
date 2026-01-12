@@ -3,10 +3,13 @@
         <div class="flex items-center justify-between">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">案件</h2>
 
-            <a href="{{ route('projects.create') }}"
-               class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700">
-                新規作成
-            </a>
+            @can('create', \App\Models\Project::class)
+                <a href="{{ route('projects.create') }}"
+                class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700">
+                    新規作成
+                </a>
+            @endcan
+
         </div>
     </x-slot>
 
@@ -15,6 +18,19 @@
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
+
+                    @if (session('success'))
+                        <div class="mb-4 p-3 border rounded-md">
+                            {{ session('success') }}
+                        </div>
+                    @endif
+
+                    @if (session('error'))
+                        <div class="mb-4 p-3 border rounded-md">
+                            {{ session('error') }}
+                        </div>
+                    @endif
+
                     @if($projects->count() === 0)
                         <p>まだ案件がありません。「新規作成」から追加してください。</p>
                     @else
@@ -44,16 +60,29 @@
                                         </td>
                                         <td class="py-2 pr-4">
                                             @php
-                                                $s = $project->starts_on?->format('Y-m-d');
-                                                $e = $project->ends_on?->format('Y-m-d');
+                                                $s = $project->start_date?->format('Y-m-d');
+                                                $e = $project->end_date?->format('Y-m-d');
                                             @endphp
                                             {{ $s || $e ? ($s ?? '—') . ' 〜 ' . ($e ?? '—') : '-' }}
                                         </td>
                                         <td class="py-2 pr-4 text-right">
-                                            <a class="text-gray-700 hover:underline"
-                                               href="{{ route('projects.edit', $project) }}">
-                                                編集
-                                            </a>
+                                            {{-- adminのみ編集 --}}
+                                            @can('update', $project)
+                                                <a href="{{ route('projects.edit', $project) }}"
+                                                class="text-gray-700 hover:underline">
+                                                    編集
+                                                </a>
+                                            @endcan
+
+                                            {{-- adminのみ削除 --}}
+                                            @can('delete', $project)
+                                                <form method="POST" action="{{ route('projects.destroy', $project) }}" class="inline"
+                                                    onsubmit="return confirm('この案件を削除します。よろしいですか？');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button class="ml-3 text-red-700 hover:underline">削除</button>
+                                                </form>
+                                            @endcan
                                         </td>
                                     </tr>
                                 @endforeach

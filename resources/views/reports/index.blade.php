@@ -56,20 +56,25 @@
                             ? ['submitted', 'all', 'rejected', 'approved']
                             : ['all', 'draft', 'submitted', 'rejected', 'approved'];
 
-                        // 現在のソート（controllerから渡される）
                         $sort = $sort ?? 'report_date';
                         $dir  = $dir ?? 'desc';
+                        $warn = $warn ?? 'all';
+                        $warningCount = (int) ($warningCount ?? 0);
                     @endphp
 
                     <div class="mb-4 flex flex-wrap gap-2">
                         @foreach($tabs as $key)
                             @php
                                 $isActive = $current === $key;
+
+                                // submitted以外ではwarnは落とす
                                 $href = route('reports.index', [
                                     'status' => $key,
                                     'sort' => $sort,
                                     'dir' => $dir,
+                                    'warn' => ($key === 'submitted') ? $warn : 'all',
                                 ]);
+
                                 $badge = $key === 'all' ? (int) $totalCount : $count($key);
                             @endphp
 
@@ -91,8 +96,37 @@
                             承認待ち（提出済み）を表示しています。「処理する」または行クリックで承認パネルへ移動できます。
                         </div>
 
-                        <div class="mb-4 text-sm text-gray-500">
-                            ※ 工数が <span class="font-semibold">0分</span> または <span class="font-semibold">24時間超</span> の場合、警告が表示されます。
+                        <div class="mb-4 flex flex-wrap items-center gap-2">
+                            @php
+                                $baseParams = [
+                                    'status' => 'submitted',
+                                    'sort' => $sort,
+                                    'dir' => $dir,
+                                ];
+
+                                $allHref = route('reports.index', $baseParams + ['warn' => 'all']);
+                                $warnHref = route('reports.index', $baseParams + ['warn' => 'warnings']);
+                            @endphp
+
+                            <a href="{{ $allHref }}"
+                               class="inline-flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm
+                                      {{ $warn === 'all' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 hover:bg-gray-50' }}">
+                                すべて
+                            </a>
+
+                            <a href="{{ $warnHref }}"
+                               class="inline-flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm
+                                      {{ $warn === 'warnings' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 hover:bg-gray-50' }}">
+                                警告のみ
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs
+                                             {{ $warn === 'warnings' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700' }}">
+                                    {{ $warningCount }}
+                                </span>
+                            </a>
+
+                            <div class="text-sm text-gray-500">
+                                ※ 工数が <span class="font-semibold">0分</span> または <span class="font-semibold">24時間超</span> の場合、警告が表示されます。
+                            </div>
                         </div>
                     @endif
 
@@ -101,6 +135,8 @@
                         <div class="mb-4 p-3 border rounded-md bg-gray-50">
                             <form method="GET" action="{{ route('reports.index') }}" class="flex flex-wrap items-center gap-3">
                                 <input type="hidden" name="status" value="{{ $current }}">
+                                <input type="hidden" name="warn" value="{{ ($current === 'submitted') ? $warn : 'all' }}">
+
                                 <div class="flex items-center gap-2">
                                     <span class="text-sm text-gray-600">並び替え</span>
                                     <select name="sort" class="border-gray-300 rounded-md shadow-sm text-sm">
@@ -122,7 +158,7 @@
                                     適用
                                 </button>
 
-                                <a href="{{ route('reports.index', ['status' => $current]) }}"
+                                <a href="{{ route('reports.index', ['status' => $current, 'warn' => ($current === 'submitted') ? $warn : 'all']) }}"
                                    class="text-sm text-gray-600 hover:underline">
                                     リセット
                                 </a>
@@ -166,20 +202,21 @@
                                         $warnOver = ($total > 24 * 60);
 
                                         $isApprover = auth()->user()->canApprove();
-                                        $isActionable = $isApprover && $report->status === 'submitted';
 
-                                        $rowHref = $isActionable
+                                        // ★ここが重要：実際に承認できるかは policy で判定
+                                        $canReview = auth()->user()->can('approve', $report);
+
+                                        $rowHref = $canReview
                                             ? route('reports.show', $report) . '#approval-panel'
                                             : route('reports.show', $report);
 
-                                        // submitted行の視認性UP：警告があるときは少し色味を変える
                                         $rowHover = 'hover:bg-amber-50';
                                         if ($warnZero) $rowHover = 'hover:bg-red-50';
                                         if ($warnOver) $rowHover = 'hover:bg-amber-100';
                                     @endphp
 
-                                    <tr class="border-b {{ $isActionable ? $rowHover . ' cursor-pointer' : '' }}"
-                                        @if($isActionable)
+                                    <tr class="border-b {{ $canReview ? $rowHover . ' cursor-pointer' : '' }}"
+                                        @if($canReview)
                                             role="link"
                                             tabindex="0"
                                             onclick="window.location.href={{ json_encode($rowHref) }};"
@@ -188,8 +225,8 @@
                                     >
                                         <td class="py-2 pr-4">
                                             <a class="text-blue-700 hover:underline"
-                                               href="{{ $rowHref }}"
-                                               onclick="event.stopPropagation();">
+                                            href="{{ $rowHref }}"
+                                            onclick="event.stopPropagation();">
                                                 {{ $report->report_date->format('Y-m-d') }}
                                             </a>
                                         </td>
@@ -197,7 +234,7 @@
                                         <td class="py-2 pr-4">
                                             {{ $label }}
 
-                                            @if($isActionable && ($warnZero || $warnOver))
+                                            @if($isApprover && $report->status === 'submitted' && ($warnZero || $warnOver))
                                                 <div class="mt-1 flex flex-wrap gap-2">
                                                     @if($warnZero)
                                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs border bg-red-50 text-red-800 border-red-200">
@@ -216,49 +253,43 @@
                                         <td class="py-2 pr-4">
                                             {{ $h }}h {{ $m }}m
                                             <span class="text-gray-500">（{{ $total }}分）</span>
-
-                                            @if($isActionable && $warnZero)
-                                                <div class="mt-1 text-xs text-red-700">
-                                                    工数が未入力の可能性があります
-                                                </div>
-                                            @endif
-                                            @if($isActionable && $warnOver)
-                                                <div class="mt-1 text-xs text-amber-900">
-                                                    合計が24時間を超えています
-                                                </div>
-                                            @endif
                                         </td>
 
                                         @if($isApprover)
-                                            <td class="py-2 pr-4">{{ $report->user->name }}</td>
+                                            <td class="py-2 pr-4">
+                                                {{ $report->user->name }}
+                                                @if((int)$report->user_id === (int)auth()->id())
+                                                    <span class="ml-2 text-xs text-gray-500">（自分）</span>
+                                                @endif
+                                            </td>
                                         @endif
 
                                         <td class="py-2 pr-4 text-right">
                                             @if($isApprover)
-                                                @if($isActionable)
+                                                @if($canReview)
                                                     <a href="{{ $rowHref }}"
-                                                       onclick="event.stopPropagation();"
-                                                       class="inline-flex items-center px-3 py-1.5 border rounded-md bg-gray-800 text-white hover:bg-gray-700">
+                                                    onclick="event.stopPropagation();"
+                                                    class="inline-flex items-center px-3 py-1.5 border rounded-md bg-gray-800 text-white hover:bg-gray-700">
                                                         処理する
                                                     </a>
                                                 @else
                                                     <a href="{{ route('reports.show', $report) }}"
-                                                       onclick="event.stopPropagation();"
-                                                       class="text-gray-700 hover:underline">
+                                                    onclick="event.stopPropagation();"
+                                                    class="text-gray-700 hover:underline">
                                                         詳細
                                                     </a>
                                                 @endif
                                             @else
                                                 @can('update', $report)
                                                     <a class="text-gray-700 hover:underline"
-                                                       href="{{ route('reports.edit', $report) }}"
-                                                       onclick="event.stopPropagation();">
+                                                    href="{{ route('reports.edit', $report) }}"
+                                                    onclick="event.stopPropagation();">
                                                         編集
                                                     </a>
                                                 @else
                                                     <a class="text-gray-700 hover:underline"
-                                                       href="{{ route('reports.show', $report) }}"
-                                                       onclick="event.stopPropagation();">
+                                                    href="{{ route('reports.show', $report) }}"
+                                                    onclick="event.stopPropagation();">
                                                         詳細
                                                     </a>
                                                 @endcan
@@ -266,6 +297,7 @@
                                         </td>
                                     </tr>
                                 @endforeach
+
                                 </tbody>
                             </table>
                         </div>

@@ -33,9 +33,9 @@
                     <div>
                         <div class="text-sm text-gray-500">期間</div>
                         <div>
-                            {{ $project->starts_on?->format('Y-m-d') ?? '—' }}
+                            {{ $project->start_date?->format('Y/m/d') ?? '—' }}
                             〜
-                            {{ $project->ends_on?->format('Y-m-d') ?? '—' }}
+                            {{ $project->end_date?->format('Y/m/d') ?? '—' }}
                         </div>
                     </div>
 

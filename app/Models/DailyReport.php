@@ -35,4 +35,12 @@ class DailyReport extends Model
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
+
+    public function statusLogs()
+    {
+        return $this->hasMany(\App\Models\DailyReportStatusLog::class)
+            ->orderBy('created_at', 'asc')
+            ->orderBy('id', 'asc');
+    }
+
 }

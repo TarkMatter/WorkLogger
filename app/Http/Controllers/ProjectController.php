@@ -2,111 +2,116 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+
 use App\Models\Project;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ProjectController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(Request $request)
+    use AuthorizesRequests;
+
+    public function index()
     {
         $projects = Project::query()
-            ->where('user_id', $request->user()->id)
-            ->latest()
-            ->paginate(15);
+            ->orderBy('name')
+            ->paginate(15)
+            ->withQueryString();
 
         return view('projects.index', compact('projects'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
-        // 画面は次。いったん到達確認用
-        // return response()->json(['message' => 'create form: coming soon']);
+        $this->authorize('create', \App\Models\Project::class);
+
         return view('projects.create');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        $data = $this->validated($request);
+        $this->authorize('create', \App\Models\Project::class);
 
-        $project = new Project($data);
-        $project->user()->associate($request->user()); // ← ここで user_id をセット
-        $project->save();
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:50', 'unique:projects,code'],
+            'name' => ['required', 'string', 'max:255', 'unique:projects,name'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'description' => ['nullable', 'string'],
+        ], [
+            'end_date.after_or_equal' => '終了日は開始日以降の日付にしてください。',
+        ]);
 
-        return redirect()->route('projects.show', $project);
+        Project::create($data);
+
+        return redirect()
+            ->route('projects.index')
+            ->with('success', '案件を作成しました。');
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Request $request,Project $project)
+    public function show(Project $project)
     {
-        $this->ensureOwner($request, $project);
-
-        // return response()->json($project);
-        return view('projects.show',compact('project'));
+        return view('projects.show', compact('project'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Request $request,Project $project)
+    public function edit(Project $project)
     {
-        $this->ensureOwner($request, $project);
+        $this->authorize('update', $project);
 
-        // return response()->json(['message' => 'edit form: coming soon', 'project' => $project]);
-        return view('projects.edit',compact('project'));
+        return view('projects.edit', compact('project'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Project $project)
     {
-        $this->ensureOwner($request, $project);
+        $this->authorize('update', $project);
 
-        $data = $this->validated($request);
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:50', Rule::unique('projects', 'code')->ignore($project->id)],
+            'name' => ['required', 'string', 'max:255', Rule::unique('projects', 'name')->ignore($project->id)],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'description' => ['nullable', 'string'],
+        ], [
+            'end_date.after_or_equal' => '終了日は開始日以降の日付にしてください。',
+        ]);
+
         $project->update($data);
 
-        return redirect()->route('projects.show', $project);
+        return redirect()
+            ->route('projects.index')
+            ->with('success', '案件を更新しました。');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Request $request, Project $project)
+    public function destroy(\App\Models\Project $project)
     {
-        $this->ensureOwner($request, $project);
+        $this->authorize('delete', $project);
 
-        $project->delete();
+        // 事前チェック：使われている案件は削除不可
+        if ($project->timeEntries()->exists()) {
+            return redirect()
+                ->route('projects.index')
+                ->with('error', 'この案件は日報の工数で使用されているため削除できません。');
+        }
 
-        return redirect()->route('projects.index');
+        try {
+            $project->delete();
+
+            return redirect()
+                ->route('projects.index')
+                ->with('success', '案件を削除しました。');
+        } catch (\Illuminate\Database\QueryException $e) {
+            // 競合などで、チェック後に参照が増えた場合もここでメッセージ化
+            $message = $e->getMessage();
+
+            if (str_contains($message, 'Integrity constraint violation') || str_contains($message, '1451')) {
+                return redirect()
+                    ->route('projects.index')
+                    ->with('error', 'この案件は日報の工数で使用されているため削除できません。');
+            }
+
+            throw $e;
+        }
     }
 
-    //projectpolicyをつくる？
-    private function ensureOwner(Request $request, Project $project): void
-    {
-        // 他人のProjectは「存在しない」扱いにする（情報漏えい防止）
-        abort_if($project->user_id !== $request->user()->id, 404);
-    }
-
-    private function validated(Request $request): array
-    {
-        return $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'code' => ['nullable', 'string', 'max:50'],
-            'status' => ['required', 'in:active,archived'],
-            'starts_on' => ['nullable', 'date'],
-            'ends_on' => ['nullable', 'date', 'after_or_equal:starts_on'],
-            'description' => ['nullable', 'string'],
-        ]);
-    }
 }

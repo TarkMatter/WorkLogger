@@ -80,10 +80,20 @@ class DailyReportPolicy
             && in_array($dailyReport->status, ['draft', 'rejected'], true);
     }
 
-    public function approve(User $user, DailyReport $dailyReport): bool
+    public function approve(\App\Models\User $user, \App\Models\DailyReport $report): bool
     {
-        // 承認者/管理者のみ、提出済みだけ承認可
-        return $user->canApprove() && $dailyReport->status === 'submitted';
+        // 承認者ロールであること
+        if (! $user->canApprove()) {
+            return false;
+        }
+
+        // 自分の日報は承認/差戻し不可（職務分離）
+        if ((int) $report->user_id === (int) $user->id) {
+            return false;
+        }
+
+        // 提出済みのみ承認/差戻し対象
+        return $report->status === 'submitted';
     }
 
     public function reject(User $user, DailyReport $dailyReport): bool

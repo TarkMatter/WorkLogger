@@ -199,16 +199,17 @@
 
                                 <div class="flex flex-wrap items-center gap-3">
                                     {{-- approve --}}
-                                    <form method="POST" action="{{ route('reports.approve', ['dailyReport' => $report]) }}"
-                                          @if(!$approveDisabled)
-                                          onsubmit="return confirm({{ json_encode(__('reports.confirm.approve')) }});"
-                                          @endif
-                                    >
-                                        @csrf
-                                        <x-primary-button @disabled($approveDisabled) title="{{ $approveDisabledReason ?? '' }}">
-                                            {{ __('reports.buttons.approve') }}
-                                        </x-primary-button>
-                                    </form>
+                                    @if($approveDisabled)
+                                        <form method="POST" action="{{ route('reports.approve', ['dailyReport' => $report]) }}">
+                                    @else
+                                        <form method="POST" action="{{ route('reports.approve', ['dailyReport' => $report]) }}"
+                                              onsubmit="return confirm({{ json_encode(__('reports.confirm.approve')) }});">
+                                    @endif
+                                            @csrf
+                                            <x-primary-button :disabled="$approveDisabled" title="{{ $approveDisabledReason ?? '' }}">
+                                                {{ __('reports.buttons.approve') }}
+                                            </x-primary-button>
+                                        </form>
 
                                     {{-- reject toggle --}}
                                     <button type="button"
@@ -241,7 +242,7 @@
                                         </div>
 
                                         <div class="flex items-center gap-3">
-                                            <x-danger-button id="reject-submit" @disabled($rejectDisabled)>{{ __('reports.buttons.reject') }}</x-danger-button>
+                                            <x-danger-button id="reject-submit" :disabled="$rejectDisabled">{{ __('reports.buttons.reject') }}</x-danger-button>
                                             <button type="button" class="text-sm text-gray-600 hover:underline"
                                                     onclick="document.getElementById('reject-panel').classList.add('hidden');">
                                                 {{ __('common.cancel') }}

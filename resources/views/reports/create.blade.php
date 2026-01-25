@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">日報 新規作成</h2>
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ __('reports.create_title') }}</h2>
     </x-slot>
 
     <div class="py-12">
@@ -12,14 +12,14 @@
                         @include('reports._form')
 
                         <div class="mt-6 flex gap-3">
-                            <x-primary-button>作成して編集へ</x-primary-button>
+                            <x-primary-button>{{ __('reports.buttons.create_and_edit') }}</x-primary-button>
                             <a href="{{ route('reports.index') }}" class="inline-flex items-center px-4 py-2 border rounded-md">
-                                戻る
+                                {{ __('common.back') }}
                             </a>
                         </div>
 
                         <p class="mt-4 text-sm text-gray-500">
-                            ※ 同じ日付の日報が既にある場合は、その編集画面へ移動します（1日1枚ルール）。
+                            {{ __('reports.notes.create_redirect') }}
                         </p>
                     </form>
                 </div>

@@ -41,6 +41,26 @@ class User extends Authenticatable
         return in_array($this->role, ['admin', 'approver'], true);
     }
 
+    public function permissions()
+    {
+        return $this->belongsToMany(\App\Models\Permission::class)->withTimestamps();
+    }
+
+    public function hasPermission(string $key): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        // すでに permissions をロードしているならメモリで判定（高速）
+        if ($this->relationLoaded('permissions')) {
+            return $this->permissions->contains(fn ($p) => $p->key === $key);
+        }
+
+        // 未ロードならDBで判定（最新状態）
+        return $this->permissions()->where('key', $key)->exists();
+    }
+
     /**
      * The attributes that should be hidden for serialization.
      *

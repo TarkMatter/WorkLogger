@@ -2,44 +2,15 @@
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                日報 詳細（{{ $report->report_date->format('Y-m-d') }}）
+                {{ __('reports.show_title_with_date', ['date' => $report->report_date->format('Y-m-d')]) }}
             </h2>
 
             @can('update', $report)
                 <a href="{{ route('reports.edit', $report) }}"
                    class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700">
-                    編集
+                    {{ __('common.edit') }}
                 </a>
             @endcan
-
-            {{-- @can('approve', $report)
-                <div class="space-y-3">
-                    <div class="flex items-center gap-2">
-                        <form method="POST" action="{{ route('reports.approve', ['dailyReport' => $report]) }}"
-                            onsubmit="return confirm('この日報を承認します。よろしいですか？');">
-                            @csrf
-                            <x-primary-button>承認</x-primary-button>
-                        </form>
-                    </div>
-
-                    <form method="POST" action="{{ route('reports.reject', ['dailyReport' => $report]) }}"
-                        class="space-y-2"
-                        onsubmit="return confirm('この日報を差戻しします。よろしいですか？');">
-                        @csrf
-
-                        <div>
-                            <x-input-label for="rejection_reason" value="差戻し理由（必須）" />
-                            <textarea id="rejection_reason" name="rejection_reason" required
-                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                                rows="3">{{ old('rejection_reason') }}</textarea>
-                            <x-input-error :messages="$errors->get('rejection_reason')" class="mt-2" />
-                        </div>
-
-                        <x-danger-button>差戻し</x-danger-button>
-                    </form>
-                </div>
-            @endcan --}}
-
         </div>
     </x-slot>
 
@@ -71,49 +42,51 @@
                     @endif
 
                     @php
-                        $statusMap = [
-                            'draft'     => ['下書き',   'bg-gray-50 text-gray-900 border-gray-200'],
-                            'submitted' => ['提出済み', 'bg-amber-50 text-amber-900 border-amber-200'],
-                            'approved'  => ['承認済み', 'bg-emerald-50 text-emerald-900 border-emerald-200'],
-                            'rejected'  => ['差戻し',   'bg-red-50 text-red-900 border-red-200'],
+                        $statusClassMap = [
+                            'draft'     => 'bg-gray-50 text-gray-900 border-gray-200',
+                            'submitted' => 'bg-amber-50 text-amber-900 border-amber-200',
+                            'approved'  => 'bg-emerald-50 text-emerald-900 border-emerald-200',
+                            'rejected'  => 'bg-red-50 text-red-900 border-red-200',
                         ];
-                        [$statusLabel, $statusClass] = $statusMap[$report->status] ?? [$report->status, 'bg-gray-50 text-gray-900 border-gray-200'];
+
+                        $statusLabel = __('reports.status.' . $report->status);
+                        $statusClass = $statusClassMap[$report->status] ?? 'bg-gray-50 text-gray-900 border-gray-200';
                     @endphp
 
                     <div class="mb-4 p-4 border rounded-lg {{ $statusClass }}">
                         <div class="flex items-start justify-between gap-4">
                             <div>
-                                <div class="text-sm opacity-80">状態</div>
+                                <div class="text-sm opacity-80">{{ __('reports.labels.status') }}</div>
                                 <div class="text-lg font-semibold">{{ $statusLabel }}</div>
                             </div>
 
                             <div class="text-sm opacity-80 text-right">
                                 @if($report->submitted_at)
-                                    <div>提出: {{ $report->submitted_at->format('Y-m-d H:i') }}</div>
+                                    <div>{{ __('reports.labels.submitted_at') }}: {{ $report->submitted_at->format('Y-m-d H:i') }}</div>
                                 @endif
                                 @if($report->approved_at)
-                                    <div>確認: {{ $report->approved_at->format('Y-m-d H:i') }}</div>
+                                    <div>{{ __('reports.labels.checked_at') }}: {{ $report->approved_at->format('Y-m-d H:i') }}</div>
                                 @endif
                             </div>
                         </div>
 
                         @if(in_array($report->status, ['approved','rejected'], true) && $report->approver)
                             <div class="mt-2 text-sm opacity-80">
-                                {{ $report->status === 'approved' ? '承認者' : '差戻し者' }}: {{ $report->approver->name }}
+                                {{ $report->status === 'approved' ? __('reports.labels.approver') : __('reports.labels.rejector') }}: {{ $report->approver->name }}
                             </div>
                         @endif
                     </div>
 
                     @if($report->status === 'rejected' && $report->rejection_reason)
                         <div class="mb-4 p-4 border border-red-200 bg-red-50 rounded-lg">
-                            <div class="text-sm font-semibold text-red-700">差戻し理由（最新）</div>
+                            <div class="text-sm font-semibold text-red-700">{{ __('reports.rejection.latest') }}</div>
                             <div class="mt-2 whitespace-pre-wrap text-red-900">{{ $report->rejection_reason }}</div>
 
                             @can('update', $report)
                                 <div class="mt-3">
                                     <a href="{{ route('reports.edit', $report) }}"
-                                    class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700">
-                                        修正して再提出する
+                                       class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700">
+                                        {{ __('reports.buttons.fix_and_resubmit') }}
                                     </a>
                                 </div>
                             @endcan
@@ -121,28 +94,15 @@
                     @endif
 
                     <div class="mb-4 p-4 border rounded-lg">
-                        <div class="text-sm text-gray-500">履歴</div>
+                        <div class="text-sm text-gray-500">{{ __('reports.labels.history') }}</div>
 
                         @php
-                            $statusLabel2 = fn($s) => match($s) {
-                                'draft' => '下書き',
-                                'submitted' => '提出済み',
-                                'approved' => '承認済み',
-                                'rejected' => '差戻し',
-                                default => $s,
-                            };
-
-                            $actionLabel = fn($a) => match($a) {
-                                'created' => '作成',
-                                'submitted' => '提出',
-                                'approved' => '承認',
-                                'rejected' => '差戻し',
-                                default => $a,
-                            };
+                            $statusLabel2 = fn($s) => $s ? __('reports.status.' . $s) : '-';
+                            $actionLabel  = fn($a) => $a ? __('reports.action.' . $a) : '-';
                         @endphp
 
                         @if($report->statusLogs->count() === 0)
-                            <div class="mt-2 text-sm text-gray-500">履歴はまだありません。</div>
+                            <div class="mt-2 text-sm text-gray-500">{{ __('reports.empty.history') }}</div>
                         @else
                             <div class="mt-3 space-y-3">
                                 @foreach($report->statusLogs as $log)
@@ -150,14 +110,14 @@
                                         <div class="flex items-start justify-between gap-4">
                                             <div class="text-sm">
                                                 <span class="font-semibold">{{ $actionLabel($log->action) }}</span>
-                                                <span class="text-gray-500">by</span>
-                                                <span class="font-semibold">{{ $log->actor->name ?? 'Unknown' }}</span>
+                                                <span class="text-gray-500">{{ __('common.by') }}</span>
+                                                <span class="font-semibold">{{ $log->actor->name ?? __('common.unknown') }}</span>
 
                                                 @if($log->from_status || $log->to_status)
                                                     <div class="text-gray-600 mt-1">
-                                                        {{ $statusLabel2($log->from_status ?? '-') }}
+                                                        {{ $statusLabel2($log->from_status) }}
                                                         <span class="mx-1">→</span>
-                                                        {{ $statusLabel2($log->to_status ?? '-') }}
+                                                        {{ $statusLabel2($log->to_status) }}
                                                     </div>
                                                 @endif
                                             </div>
@@ -169,7 +129,7 @@
 
                                         @if($log->reason)
                                             <div class="mt-2 text-sm">
-                                                <div class="text-xs font-semibold text-gray-500">理由</div>
+                                                <div class="text-xs font-semibold text-gray-500">{{ __('reports.labels.reason') }}</div>
                                                 <div class="mt-1 whitespace-pre-wrap">{{ $log->reason }}</div>
                                             </div>
                                         @endif
@@ -179,22 +139,7 @@
                         @endif
                     </div>
 
-
-                    <div>
-                        <div class="text-sm text-gray-500">状態</div>
-                        @php
-                            $label = match($report->status) {
-                                'draft' => '下書き',
-                                'submitted' => '提出済み',
-                                'approved' => '承認済み',
-                                'rejected' => '差戻し',
-                                default => $report->status,
-                            };
-                        @endphp
-                        <div class="font-semibold">{{ $label }}</div>
-
-                    </div>
-
+                    {{-- approval panel --}}
                     @can('approve', $report)
                         @if($report->status === 'submitted')
                             @php
@@ -205,17 +150,14 @@
                                 $warnZero = ($total === 0);
                                 $warnOver = ($total > 24 * 60);
 
-                                // 警告があるなら承認はUIでも無効化（サーバ側でも弾いてる）
                                 $approveDisabled = ($warnZero || $warnOver);
 
                                 $approveDisabledReason = $warnZero
-                                    ? '工数が0分のため承認できません（未入力の可能性）。'
-                                    : ($warnOver ? '合計工数が24時間を超えているため承認できません（異常値の可能性）。' : null);
+                                    ? __('reports.warnings.reason_zero')
+                                    : ($warnOver ? __('reports.warnings.reason_over') : null);
 
-                                // 差戻しフォームを開いた状態にしたい条件
                                 $openReject = old('rejection_reason') || $errors->has('rejection_reason') || $warnZero || $warnOver;
 
-                                // 差戻し理由が空（trim後に空）なら差戻しボタン無効
                                 $initialReason = (string) old('rejection_reason', '');
                                 $rejectDisabled = trim($initialReason) === '';
                                 $initialCounter = mb_strlen($initialReason);
@@ -224,268 +166,130 @@
                             <div id="approval-panel" class="mt-4 p-4 border rounded-lg space-y-3">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
-                                        <div class="text-sm text-gray-500">承認操作</div>
-                                        <div class="font-semibold">この日報は提出済みです</div>
+                                        <div class="text-sm text-gray-500">{{ __('reports.labels.approval_actions') }}</div>
+                                        <div class="font-semibold">{{ __('reports.labels.submitted_notice') }}</div>
 
                                         <div class="mt-1 text-sm text-gray-600">
-                                            合計工数：<span class="font-semibold">{{ $hours }}h {{ $mins }}m</span>（{{ $total }}分）
+                                            {{ __('reports.labels.total') }}: <span class="font-semibold">{{ $hours }}h {{ $mins }}m</span>
+                                            <span class="text-gray-500">({{ $total }}{{ __('reports.units.minutes') }})</span>
                                         </div>
 
                                         @if($warnZero || $warnOver)
                                             <div class="mt-2 flex flex-wrap gap-2">
                                                 @if($warnZero)
                                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs border bg-red-50 text-red-800 border-red-200">
-                                                        ⚠ 工数0（未入力の可能性）
+                                                        {{ __('reports.warnings.badge_zero') }}
                                                     </span>
                                                 @endif
                                                 @if($warnOver)
                                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs border bg-amber-50 text-amber-900 border-amber-200">
-                                                        ⚠ 24h超（異常値の可能性）
+                                                        {{ __('reports.warnings.badge_over') }}
                                                     </span>
                                                 @endif
                                             </div>
+                                        @endif
 
-                                            <div class="mt-2 text-sm text-gray-700">
+                                        @if($approveDisabledReason)
+                                            <div class="mt-2 text-sm text-red-700">
                                                 {{ $approveDisabledReason }}
-                                                差戻しで修正依頼するのがおすすめです。
-                                            </div>
-                                        @else
-                                            <div class="mt-2 text-sm text-gray-500">
-                                                承認するか、理由を添えて差戻しできます。
                                             </div>
                                         @endif
                                     </div>
-
-                                    {{-- 承認ボタン（警告があるときは無効化） --}}
-                                    <form method="POST"
-                                        action="{{ route('reports.approve', ['dailyReport' => $report]) }}"
-                                        onsubmit="return {{ $approveDisabled ? 'false' : "confirm('この日報を承認します。よろしいですか？')" }};">
-                                        @csrf
-
-                                        <button type="submit"
-                                                class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                {{ $approveDisabled ? 'disabled' : '' }}
-                                                title="{{ $approveDisabled ? $approveDisabledReason : '' }}">
-                                            承認
-                                        </button>
-
-                                        @if($approveDisabled)
-                                            <div class="mt-2 text-xs text-gray-500 text-right">
-                                                ※ 警告があるため承認は無効です
-                                            </div>
-                                        @endif
-                                    </form>
                                 </div>
 
-                                {{-- 差戻し --}}
-                                <details class="border rounded-md" @if($openReject) open @endif>
-                                    <summary class="cursor-pointer select-none px-3 py-2 text-sm font-semibold">
-                                        差戻し（理由必須）
-                                    </summary>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    {{-- approve --}}
+                                    <form method="POST" action="{{ route('reports.approve', ['dailyReport' => $report]) }}"
+                                          @if(!$approveDisabled)
+                                          onsubmit="return confirm({{ json_encode(__('reports.confirm.approve')) }});"
+                                          @endif
+                                    >
+                                        @csrf
+                                        <x-primary-button @disabled($approveDisabled) title="{{ $approveDisabledReason ?? '' }}">
+                                            {{ __('reports.buttons.approve') }}
+                                        </x-primary-button>
+                                    </form>
 
-                                    <div class="px-3 pb-3 pt-2 space-y-3">
+                                    {{-- reject toggle --}}
+                                    <button type="button"
+                                            class="inline-flex items-center px-4 py-2 border rounded-md bg-white hover:bg-gray-50"
+                                            onclick="document.getElementById('reject-panel').classList.toggle('hidden');">
+                                        {{ __('reports.buttons.reject') }}
+                                    </button>
+                                </div>
 
-                                        {{-- テンプレ（よくある指摘） --}}
-                                        <div class="p-3 border rounded-md bg-gray-50">
-                                            <div class="text-xs font-semibold text-gray-600 mb-2">よくある指摘（クリックで追記）</div>
+                                {{-- reject panel --}}
+                                <div id="reject-panel" class="{{ $openReject ? '' : 'hidden' }} mt-3 p-4 border rounded-lg bg-gray-50">
+                                    <form method="POST" action="{{ route('reports.reject', ['dailyReport' => $report]) }}"
+                                          class="space-y-3"
+                                          onsubmit="return confirm({{ json_encode(__('reports.confirm.reject')) }});">
+                                        @csrf
 
-                                            <div class="flex flex-wrap gap-2">
-                                                <button type="button"
-                                                        class="tpl-btn inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm"
-                                                        data-text="工数の内訳が不明確です。各行の「作業内容」をもう少し具体的に追記してください。">
-                                                    内訳が不明確
-                                                </button>
+                                        <div>
+                                            <x-input-label for="rejection_reason" :value="__('reports.rejection.required')" />
+                                            <textarea id="rejection_reason" name="rejection_reason" required
+                                                      class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                                      rows="4"
+                                                      placeholder="{{ __('reports.rejection.placeholder') }}"
+                                                      oninput="document.getElementById('reject-counter').textContent = this.value.length; document.getElementById('reject-submit').disabled = (this.value.trim().length === 0);"
+                                            >{{ old('rejection_reason') }}</textarea>
+                                            <x-input-error :messages="$errors->get('rejection_reason')" class="mt-2" />
 
-                                                <button type="button"
-                                                        class="tpl-btn inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm"
-                                                        data-text="案件の選択が誤っている可能性があります。正しい案件に付け替えて再提出してください。">
-                                                    案件が違う
-                                                </button>
-
-                                                <button type="button"
-                                                        class="tpl-btn inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm"
-                                                        data-text="合計工数が24時間を超えています。入力ミスがないか確認して修正してください。">
-                                                    24h超
-                                                </button>
-
-                                                <button type="button"
-                                                        class="tpl-btn inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm"
-                                                        data-text="メモが不足しています。背景／判断理由／成果（何ができたか）を追記してください。">
-                                                    メモ不足
-                                                </button>
-
-                                                <button type="button"
-                                                        class="tpl-btn inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm"
-                                                        data-text="工数が0分になっています。工数の入力を確認して再提出してください。">
-                                                    工数0
-                                                </button>
-
-                                                <button type="button"
-                                                        id="tpl-clear"
-                                                        class="inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm text-gray-700">
-                                                    クリア
-                                                </button>
-                                            </div>
-
-                                            <div class="mt-2 text-xs text-gray-500">
-                                                ※ 既に入力がある場合は末尾に追記します（誤って消さないため）
+                                            <div class="mt-1 text-xs text-gray-500">
+                                                <span id="reject-counter">{{ $initialCounter }}</span>{{ __('reports.rejection.counter_suffix') }}
                                             </div>
                                         </div>
 
-                                        <form method="POST"
-                                            action="{{ route('reports.reject', ['dailyReport' => $report]) }}"
-                                            class="space-y-2"
-                                            onsubmit="return confirm('この日報を差戻しします。よろしいですか？');">
-                                            @csrf
-
-                                            <div>
-                                                <label for="rejection_reason" class="text-sm font-semibold text-gray-700">
-                                                    差戻し理由（必須 / 1000文字以内）
-                                                </label>
-
-                                                <textarea id="rejection_reason"
-                                                        name="rejection_reason"
-                                                        required
-                                                        maxlength="1000"
-                                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                                                        rows="5"
-                                                        placeholder="例：工数の内訳が不明確です。作業内容を追記してください。">{{ $initialReason }}</textarea>
-
-                                                <div class="mt-1 flex items-center justify-between text-xs text-gray-500">
-                                                    <span id="reject-hint">※ 空（空白のみ）は送信できません</span>
-                                                    <span id="rejection-counter">{{ $initialCounter }}/1000</span>
-                                                </div>
-
-                                                @if($errors->has('rejection_reason'))
-                                                    <div class="mt-2 text-sm text-red-600">
-                                                        {{ $errors->first('rejection_reason') }}
-                                                    </div>
-                                                @endif
-                                            </div>
-
-                                            <div class="flex items-center justify-end gap-2">
-                                                <a href="#" class="text-sm text-gray-500 hover:underline"
-                                                onclick="this.closest('details').removeAttribute('open'); return false;">
-                                                    閉じる
-                                                </a>
-
-                                                <button type="submit"
-                                                        id="reject-button"
-                                                        class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        {{ $rejectDisabled ? 'disabled' : '' }}
-                                                        title="{{ $rejectDisabled ? '差戻し理由を入力してください（空白のみは不可）' : '' }}">
-                                                    差戻し
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </details>
+                                        <div class="flex items-center gap-3">
+                                            <x-danger-button id="reject-submit" @disabled($rejectDisabled)>{{ __('reports.buttons.reject') }}</x-danger-button>
+                                            <button type="button" class="text-sm text-gray-600 hover:underline"
+                                                    onclick="document.getElementById('reject-panel').classList.add('hidden');">
+                                                {{ __('common.cancel') }}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
-
-                            <script>
-                                document.addEventListener('DOMContentLoaded', () => {
-                                    const textarea = document.getElementById('rejection_reason');
-                                    const rejectBtn = document.getElementById('reject-button');
-                                    const counter = document.getElementById('rejection-counter');
-                                    const clearBtn = document.getElementById('tpl-clear');
-
-                                    if (!textarea || !rejectBtn) return;
-
-                                    const update = () => {
-                                        const raw = textarea.value ?? '';
-                                        const trimmed = raw.trim();
-
-                                        const ok = trimmed.length > 0;
-
-                                        rejectBtn.disabled = !ok;
-                                        rejectBtn.title = ok ? '' : '差戻し理由を入力してください（空白のみは不可）';
-
-                                        if (counter) counter.textContent = `${raw.length}/1000`;
-                                    };
-
-                                    const appendTemplate = (text) => {
-                                        const raw = textarea.value ?? '';
-                                        const next = raw.trim().length > 0 ? (raw.replace(/\s*$/, '') + "\n" + text) : text;
-                                        textarea.value = next;
-                                        textarea.focus();
-                                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                                    };
-
-                                    document.querySelectorAll('.tpl-btn').forEach((btn) => {
-                                        btn.addEventListener('click', () => {
-                                            const text = btn.getAttribute('data-text') || '';
-                                            if (text) appendTemplate(text);
-                                        });
-                                    });
-
-                                    if (clearBtn) {
-                                        clearBtn.addEventListener('click', () => {
-                                            textarea.value = '';
-                                            textarea.focus();
-                                            textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                                        });
-                                    }
-
-                                    textarea.addEventListener('input', update);
-                                    update();
-                                });
-                            </script>
                         @endif
                     @endcan
 
-
-
-                    @if($report->approved_by)
-                        <div>
-                            <div class="text-sm text-gray-500">{{ $report->status === 'approved' ? '承認者' : '確認者（差戻し）' }}</div>
-                            <div class="font-semibold">
-                                {{ $report->approver?->name ?? '不明' }}
-                                @if($report->approved_at)
-                                    （{{ $report->approved_at->format('Y-m-d H:i') }}）
-                                @endif
-                            </div>
-                        </div>
-                    @endif
-
-
-                    @if(auth()->user()->canApprove())
-                        <div>
-                            <div class="text-sm text-gray-500">ユーザー</div>
-                            <div class="font-semibold">{{ $report->user->name }}</div>
-                        </div>
-                    @endif
-
-                    <div>
-                        <div class="text-sm text-gray-500">メモ</div>
-                        <div class="whitespace-pre-wrap">{{ $report->memo ?? '-' }}</div>
-                    </div>
-
-
-                    <hr class="my-6">
+                    {{-- time entries summary (read-only) --}}
                     @php
-                        $total = $report->timeEntries->sum('minutes');
-                        $hours = intdiv($total, 60);
-                        $mins  = $total % 60;
+                        $total = (int) $report->timeEntries->sum('minutes');
+                        $h = intdiv($total, 60);
+                        $m = $total % 60;
                     @endphp
 
-                    <div class="space-y-3">
-                        <h3 class="text-lg font-semibold">工数</h3>
+                    <div class="p-4 border rounded-lg">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <div class="text-sm text-gray-500">{{ __('reports.labels.time_entries') }}</div>
+                                <div class="text-lg font-semibold">
+                                    {{ __('reports.labels.total') }}: {{ $h }}h {{ $m }}m
+                                    <span class="text-gray-500 text-sm">({{ $total }}{{ __('reports.units.minutes') }})</span>
+                                </div>
+                            </div>
 
-                        <div>
-                            <div class="text-sm text-gray-500">合計</div>
-                            <div class="text-lg font-semibold">{{ $hours }}h {{ $mins }}m（{{ $total }} 分）</div>
+                            @can('update', $report)
+                                @if($report->status === 'draft' || $report->status === 'rejected')
+                                    <a href="{{ route('reports.edit', $report) }}"
+                                       class="inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50">
+                                        {{ __('common.edit') }}
+                                    </a>
+                                @endif
+                            @endcan
                         </div>
 
                         @if($report->timeEntries->count() === 0)
-                            <p class="text-gray-700">工数がありません。</p>
+                            <p class="mt-3 text-gray-700">{{ __('reports.empty.entries') }}</p>
                         @else
-                            <div class="overflow-x-auto">
+                            <div class="mt-3 overflow-x-auto">
                                 <table class="min-w-full text-sm">
                                     <thead class="text-left border-b">
                                         <tr>
-                                            <th class="py-2 pr-4">案件</th>
-                                            <th class="py-2 pr-4">作業内容</th>
-                                            <th class="py-2 pr-4">分</th>
+                                            <th class="py-2 pr-4">{{ __('reports.labels.project') }}</th>
+                                            <th class="py-2 pr-4">{{ __('reports.labels.task_optional') }}</th>
+                                            <th class="py-2 pr-4">{{ __('reports.labels.minutes') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -502,12 +306,15 @@
                         @endif
                     </div>
 
-
-                    <div class="pt-4">
-                        <a href="{{ route('reports.index') }}" class="inline-flex items-center px-4 py-2 border rounded-md">
-                            一覧へ
-                        </a>
-                    </div>
+                    {{-- delete --}}
+                    @can('delete', $report)
+                        <form method="POST" action="{{ route('reports.destroy', $report) }}" class="mt-2"
+                              onsubmit="return confirm({{ json_encode(__('reports.confirm.delete_report')) }});">
+                            @csrf
+                            @method('DELETE')
+                            <x-danger-button>{{ __('common.delete') }}</x-danger-button>
+                        </form>
+                    @endcan
                 </div>
             </div>
         </div>

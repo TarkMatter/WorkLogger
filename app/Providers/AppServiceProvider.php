@@ -6,6 +6,8 @@ use Illuminate\Support\ServiceProvider;
 
 use Illuminate\Support\Facades\Gate;
 
+use App\Models\User;
+
 use App\Models\Project;
 use App\Policies\ProjectPolicy;
 
@@ -32,5 +34,9 @@ class AppServiceProvider extends ServiceProvider
 
         // 既にDailyReportPolicyを使っているなら、ここで登録しておくと確実
         Gate::policy(DailyReport::class, DailyReportPolicy::class);
+
+        Gate::define('manage-user-permissions', function (User $user) {
+            return $user->isAdmin();
+        });
     }
 }

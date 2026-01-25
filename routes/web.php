@@ -4,6 +4,8 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use \App\Http\Controllers\ProjectController;
 
+use App\Http\Controllers\Admin\UserPermissionController;
+
 Route::get('/', function () {
     return view('welcome');
 });
@@ -17,6 +19,12 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+
+    Route::prefix('admin')->name('admin.')->middleware(['auth', 'can:manage-user-permissions'])->group(function () {
+    Route::get('users', [UserPermissionController::class, 'index'])->name('users.index');
+    Route::get('users/{user}/permissions', [UserPermissionController::class, 'edit'])->name('users.permissions.edit');
+    Route::put('users/{user}/permissions', [UserPermissionController::class, 'update'])->name('users.permissions.update');
+});
     // --------------------------------------------------
     //　案件のCRUD
 

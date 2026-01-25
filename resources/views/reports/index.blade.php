@@ -1,11 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">日報</h2>
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ __('reports.title') }}</h2>
 
             <a href="{{ route('reports.create') }}"
                class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700">
-                新規作成
+                {{ __('common.create') }}
             </a>
         </div>
     </x-slot>
@@ -41,11 +41,11 @@
                     {{-- tabs --}}
                     @php
                         $statusLabels = [
-                            'all'       => 'すべて',
-                            'draft'     => '下書き',
-                            'submitted' => '提出済み（未処理）',
-                            'approved'  => '承認済み',
-                            'rejected'  => '差戻し',
+                            'all'       => __('reports.tabs.all'),
+                            'draft'     => __('reports.tabs.draft'),
+                            'submitted' => __('reports.tabs.submitted'),
+                            'approved'  => __('reports.tabs.approved'),
+                            'rejected'  => __('reports.tabs.rejected'),
                         ];
 
                         $current = $status ?? 'all';
@@ -67,7 +67,7 @@
                             @php
                                 $isActive = $current === $key;
 
-                                // submitted以外ではwarnは落とす
+                                // For tabs other than submitted, reset warn filter
                                 $href = route('reports.index', [
                                     'status' => $key,
                                     'sort' => $sort,
@@ -93,7 +93,7 @@
 
                     @if(auth()->user()->canApprove() && $current === 'submitted')
                         <div class="mb-2 text-sm text-gray-500">
-                            承認待ち（提出済み）を表示しています。「処理する」または行クリックで承認パネルへ移動できます。
+                            {{ __('reports.notes.approver_submitted_hint') }}
                         </div>
 
                         <div class="mb-4 flex flex-wrap items-center gap-2">
@@ -111,13 +111,13 @@
                             <a href="{{ $allHref }}"
                                class="inline-flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm
                                       {{ $warn === 'all' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 hover:bg-gray-50' }}">
-                                すべて
+                                {{ __('reports.warnings.all') }}
                             </a>
 
                             <a href="{{ $warnHref }}"
                                class="inline-flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm
                                       {{ $warn === 'warnings' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 hover:bg-gray-50' }}">
-                                警告のみ
+                                {{ __('reports.warnings.only') }}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs
                                              {{ $warn === 'warnings' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700' }}">
                                     {{ $warningCount }}
@@ -125,7 +125,7 @@
                             </a>
 
                             <div class="text-sm text-gray-500">
-                                ※ 工数が <span class="font-semibold">0分</span> または <span class="font-semibold">24時間超</span> の場合、警告が表示されます。
+                                {{ __('reports.notes.warnings_explain') }}
                             </div>
                         </div>
                     @endif
@@ -138,29 +138,29 @@
                                 <input type="hidden" name="warn" value="{{ ($current === 'submitted') ? $warn : 'all' }}">
 
                                 <div class="flex items-center gap-2">
-                                    <span class="text-sm text-gray-600">並び替え</span>
+                                    <span class="text-sm text-gray-600">{{ __('reports.labels.sort') }}</span>
                                     <select name="sort" class="border-gray-300 rounded-md shadow-sm text-sm">
-                                        <option value="report_date" @selected($sort === 'report_date')>日付</option>
-                                        <option value="user_name" @selected($sort === 'user_name')>ユーザー名</option>
-                                        <option value="total_minutes" @selected($sort === 'total_minutes')>合計工数</option>
+                                        <option value="report_date" @selected($sort === 'report_date')>{{ __('reports.sort.date') }}</option>
+                                        <option value="user_name" @selected($sort === 'user_name')>{{ __('reports.sort.user_name') }}</option>
+                                        <option value="total_minutes" @selected($sort === 'total_minutes')>{{ __('reports.sort.total_minutes') }}</option>
                                     </select>
                                 </div>
 
                                 <div class="flex items-center gap-2">
-                                    <span class="text-sm text-gray-600">順序</span>
+                                    <span class="text-sm text-gray-600">{{ __('reports.labels.order') }}</span>
                                     <select name="dir" class="border-gray-300 rounded-md shadow-sm text-sm">
-                                        <option value="desc" @selected($dir === 'desc')>降順</option>
-                                        <option value="asc" @selected($dir === 'asc')>昇順</option>
+                                        <option value="desc" @selected($dir === 'desc')>{{ __('reports.sort.desc') }}</option>
+                                        <option value="asc" @selected($dir === 'asc')>{{ __('reports.sort.asc') }}</option>
                                     </select>
                                 </div>
 
                                 <button class="inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm">
-                                    適用
+                                    {{ __('common.apply') }}
                                 </button>
 
                                 <a href="{{ route('reports.index', ['status' => $current, 'warn' => ($current === 'submitted') ? $warn : 'all']) }}"
                                    class="text-sm text-gray-600 hover:underline">
-                                    リセット
+                                    {{ __('common.reset') }}
                                 </a>
                             </form>
                         </div>
@@ -168,31 +168,25 @@
 
                     {{-- table --}}
                     @if($reports->count() === 0)
-                        <p>日報がありません。</p>
+                        <p>{{ __('reports.empty.reports') }}</p>
                     @else
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-sm">
                                 <thead class="text-left border-b">
                                     <tr>
-                                        <th class="py-2 pr-4">日付</th>
-                                        <th class="py-2 pr-4">状態</th>
-                                        <th class="py-2 pr-4">合計</th>
+                                        <th class="py-2 pr-4">{{ __('reports.labels.date') }}</th>
+                                        <th class="py-2 pr-4">{{ __('reports.labels.status') }}</th>
+                                        <th class="py-2 pr-4">{{ __('reports.labels.total') }}</th>
                                         @if(auth()->user()->canApprove())
-                                            <th class="py-2 pr-4">ユーザー</th>
+                                            <th class="py-2 pr-4">{{ __('reports.labels.user') }}</th>
                                         @endif
-                                        <th class="py-2 pr-4 text-right">操作</th>
+                                        <th class="py-2 pr-4 text-right">{{ __('reports.labels.operations') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                 @foreach($reports as $report)
                                     @php
-                                        $label = match($report->status) {
-                                            'draft' => '下書き',
-                                            'submitted' => '提出済み',
-                                            'approved' => '承認済み',
-                                            'rejected' => '差戻し',
-                                            default => $report->status,
-                                        };
+                                        $label = __('reports.status.' . $report->status);
 
                                         $total = (int) ($report->total_minutes ?? 0);
                                         $h = intdiv($total, 60);
@@ -203,7 +197,6 @@
 
                                         $isApprover = auth()->user()->canApprove();
 
-                                        // ★ここが重要：実際に承認できるかは policy で判定
                                         $canReview = auth()->user()->can('approve', $report);
 
                                         $rowHref = $canReview
@@ -225,8 +218,8 @@
                                     >
                                         <td class="py-2 pr-4">
                                             <a class="text-blue-700 hover:underline"
-                                            href="{{ $rowHref }}"
-                                            onclick="event.stopPropagation();">
+                                               href="{{ $rowHref }}"
+                                               onclick="event.stopPropagation();">
                                                 {{ $report->report_date->format('Y-m-d') }}
                                             </a>
                                         </td>
@@ -238,12 +231,12 @@
                                                 <div class="mt-1 flex flex-wrap gap-2">
                                                     @if($warnZero)
                                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs border bg-red-50 text-red-800 border-red-200">
-                                                            ⚠ 工数0
+                                                            {{ __('reports.warnings.badge_zero') }}
                                                         </span>
                                                     @endif
                                                     @if($warnOver)
                                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs border bg-amber-50 text-amber-900 border-amber-200">
-                                                            ⚠ 24h超
+                                                            {{ __('reports.warnings.badge_over') }}
                                                         </span>
                                                     @endif
                                                 </div>
@@ -252,14 +245,14 @@
 
                                         <td class="py-2 pr-4">
                                             {{ $h }}h {{ $m }}m
-                                            <span class="text-gray-500">（{{ $total }}分）</span>
+                                            <span class="text-gray-500">({{ $total }}{{ __('reports.units.minutes') }})</span>
                                         </td>
 
                                         @if($isApprover)
                                             <td class="py-2 pr-4">
                                                 {{ $report->user->name }}
                                                 @if((int)$report->user_id === (int)auth()->id())
-                                                    <span class="ml-2 text-xs text-gray-500">（自分）</span>
+                                                    <span class="ml-2 text-xs text-gray-500">{{ __('reports.misc.self') }}</span>
                                                 @endif
                                             </td>
                                         @endif
@@ -268,29 +261,29 @@
                                             @if($isApprover)
                                                 @if($canReview)
                                                     <a href="{{ $rowHref }}"
-                                                    onclick="event.stopPropagation();"
-                                                    class="inline-flex items-center px-3 py-1.5 border rounded-md bg-gray-800 text-white hover:bg-gray-700">
-                                                        処理する
+                                                       onclick="event.stopPropagation();"
+                                                       class="inline-flex items-center px-3 py-1.5 border rounded-md bg-gray-800 text-white hover:bg-gray-700">
+                                                        {{ __('reports.buttons.process') }}
                                                     </a>
                                                 @else
                                                     <a href="{{ route('reports.show', $report) }}"
-                                                    onclick="event.stopPropagation();"
-                                                    class="text-gray-700 hover:underline">
-                                                        詳細
+                                                       onclick="event.stopPropagation();"
+                                                       class="text-gray-700 hover:underline">
+                                                        {{ __('reports.buttons.detail') }}
                                                     </a>
                                                 @endif
                                             @else
                                                 @can('update', $report)
                                                     <a class="text-gray-700 hover:underline"
-                                                    href="{{ route('reports.edit', $report) }}"
-                                                    onclick="event.stopPropagation();">
-                                                        編集
+                                                       href="{{ route('reports.edit', $report) }}"
+                                                       onclick="event.stopPropagation();">
+                                                        {{ __('reports.buttons.edit') }}
                                                     </a>
                                                 @else
                                                     <a class="text-gray-700 hover:underline"
-                                                    href="{{ route('reports.show', $report) }}"
-                                                    onclick="event.stopPropagation();">
-                                                        詳細
+                                                       href="{{ route('reports.show', $report) }}"
+                                                       onclick="event.stopPropagation();">
+                                                        {{ __('reports.buttons.detail') }}
                                                     </a>
                                                 @endcan
                                             @endif

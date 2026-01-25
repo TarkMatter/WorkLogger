@@ -7,9 +7,7 @@ use App\Models\User;
 
 class ProjectPolicy
 {
-    /**
-     * 一覧/参照は全員OK（案件選択に必要）
-     */
+    // 読み取りは全員OK
     public function viewAny(User $user): bool
     {
         return true;
@@ -20,21 +18,19 @@ class ProjectPolicy
         return true;
     }
 
-    /**
-     * ここから下は管理系：adminのみ
-     */
+    // ここからCRUD：adminが付与した権限がある場合のみ
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->hasPermission('projects.create');
     }
 
     public function update(User $user, Project $project): bool
     {
-        return $user->isAdmin();
+        return $user->hasPermission('projects.update');
     }
 
     public function delete(User $user, Project $project): bool
     {
-        return $user->isAdmin();
+        return $user->hasPermission('projects.delete');
     }
 }

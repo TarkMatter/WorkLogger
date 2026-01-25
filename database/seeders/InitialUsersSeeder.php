@@ -13,7 +13,7 @@ class InitialUsersSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'admin@example.com'],
             [
-                'name' => 'Admin',
+                'name' => 'あどみん',
                 'password' => Hash::make('password'),
                 'role' => 'admin',
             ]
@@ -22,7 +22,7 @@ class InitialUsersSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'approver@example.com'],
             [
-                'name' => 'Approver',
+                'name' => 'あぷろーばー',
                 'password' => Hash::make('password'),
                 'role' => 'approver',
             ]
@@ -31,7 +31,7 @@ class InitialUsersSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'member@example.com'],
             [
-                'name' => 'member',
+                'name' => 'めんばー',
                 'password' => Hash::make('password'),
                 'role' => 'member',
             ]

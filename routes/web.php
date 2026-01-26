@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
 use \App\Http\Controllers\ProjectController;
 
 use App\Http\Controllers\Admin\UserPermissionController;
@@ -13,6 +14,17 @@ Route::get('/', function () {
 Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
+
+Route::post('/locale', function (Request $request) {
+    $data = $request->validate([
+        'locale' => ['required', 'in:ja,en'],
+    ]);
+
+    session(['locale' => $data['locale']]);
+
+    return back()->withCookie(cookie()->forever('locale', $data['locale']));
+})->name('locale.set');
+
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 use App\Models\Project;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use App\Http\Requests\StoreProjectRequest;
+use App\Http\Requests\UpdateProjectRequest;
+use Illuminate\Database\QueryException;
 
 class ProjectController extends Controller
 {
+    // フラッシュメッセージは Controller のヘルパで統一。
     use AuthorizesRequests;
 
     public function index()
@@ -29,29 +31,24 @@ class ProjectController extends Controller
         return view('projects.create');
     }
 
-    public function store(Request $request)
+    public function store(StoreProjectRequest $request)
     {
         $this->authorize('create', \App\Models\Project::class);
 
-        $data = $request->validate([
-            'code' => ['required', 'string', 'max:50', 'unique:projects,code'],
-            'name' => ['required', 'string', 'max:255', 'unique:projects,name'],
-            'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-            'description' => ['nullable', 'string'],
-        ], [
-            'end_date.after_or_equal' => '終了日は開始日以降の日付にしてください。',
-        ]);
+        $data = $request->validated();
 
         Project::create($data);
 
-        return redirect()
-            ->route('projects.index')
-            ->with('success', '案件を作成しました。');
+        return $this->redirectRouteWithSuccess(
+            'projects.index',
+            [],
+            __('flash.created', ['item' => __('models.project')])
+        );
     }
 
     public function show(Project $project)
     {
+        // 読み取りは全員OKの想定（要件通り）
         return view('projects.show', compact('project'));
     }
 
@@ -62,56 +59,55 @@ class ProjectController extends Controller
         return view('projects.edit', compact('project'));
     }
 
-    public function update(Request $request, Project $project)
+    public function update(UpdateProjectRequest $request, Project $project)
     {
         $this->authorize('update', $project);
 
-        $data = $request->validate([
-            'code' => ['required', 'string', 'max:50', Rule::unique('projects', 'code')->ignore($project->id)],
-            'name' => ['required', 'string', 'max:255', Rule::unique('projects', 'name')->ignore($project->id)],
-            'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-            'description' => ['nullable', 'string'],
-        ], [
-            'end_date.after_or_equal' => '終了日は開始日以降の日付にしてください。',
-        ]);
+        $data = $request->validated();
 
         $project->update($data);
 
-        return redirect()
-            ->route('projects.index')
-            ->with('success', '案件を更新しました。');
+        return $this->redirectRouteWithSuccess(
+            'projects.index',
+            [],
+            __('flash.updated', ['item' => __('models.project')])
+        );
     }
 
-    public function destroy(\App\Models\Project $project)
+    public function destroy(Project $project)
     {
         $this->authorize('delete', $project);
 
         // 事前チェック：使われている案件は削除不可
         if ($project->timeEntries()->exists()) {
-            return redirect()
-                ->route('projects.index')
-                ->with('error', 'この案件は日報の工数で使用されているため削除できません。');
+            return $this->redirectRouteWithError(
+                'projects.index',
+                [],
+                __('projects.flash.cannot_delete_in_use')
+            );
         }
 
         try {
             $project->delete();
 
-            return redirect()
-                ->route('projects.index')
-                ->with('success', '案件を削除しました。');
-        } catch (\Illuminate\Database\QueryException $e) {
+            return $this->redirectRouteWithSuccess(
+                'projects.index',
+                [],
+                __('flash.deleted', ['item' => __('models.project')])
+            );
+        } catch (QueryException $e) {
             // 競合などで、チェック後に参照が増えた場合もここでメッセージ化
             $message = $e->getMessage();
 
             if (str_contains($message, 'Integrity constraint violation') || str_contains($message, '1451')) {
-                return redirect()
-                    ->route('projects.index')
-                    ->with('error', 'この案件は日報の工数で使用されているため削除できません。');
+                return $this->redirectRouteWithError(
+                    'projects.index',
+                    [],
+                    __('projects.flash.cannot_delete_in_use')
+                );
             }
 
             throw $e;
         }
     }
-
 }

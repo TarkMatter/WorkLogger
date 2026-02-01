@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'language' => '言語',
     'dashboard' => 'ダッシュボード',
     'projects' => '案件',
     'reports' => '日報',

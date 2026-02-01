@@ -9,14 +9,18 @@ return [
     ],
 
     'label' => [
-        'projects.create' => '案件：作成',
-        'projects.update' => '案件：更新',
-        'projects.delete' => '案件：削除',
+        'projects' => [
+            'create' => '案件：作成',
+            'update' => '案件：更新',
+            'delete' => '案件：削除',
+        ],
     ],
 
     'description' => [
-        'projects.create' => '案件を新規作成できる',
-        'projects.update' => '案件を更新できる',
-        'projects.delete' => '案件を削除できる',
+        'projects' => [
+            'create' => '案件を新規作成できる',
+            'update' => '案件を更新できる',
+            'delete' => '案件を削除できる',
+        ],
     ],
 ];

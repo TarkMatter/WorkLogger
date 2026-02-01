@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'language' => 'Language',
     'dashboard' => 'Dashboard',
     'projects' => 'Projects',
     'reports' => 'Daily Reports',

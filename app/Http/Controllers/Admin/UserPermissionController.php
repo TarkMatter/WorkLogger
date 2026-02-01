@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UpdateUserPermissionsRequest;
 use App\Models\Permission;
 use App\Models\User;
-use Illuminate\Http\Request;
 
 class UserPermissionController extends Controller
 {
+    // 管理者向けのユーザー/権限編集機能。
     public function index()
     {
     $users = User::query()
@@ -34,21 +35,9 @@ class UserPermissionController extends Controller
         return view('admin.users.permissions', compact('user', 'permissions', 'assigned'));
     }
 
-    public function update(Request $request, User $user)
+    public function update(UpdateUserPermissionsRequest $request, User $user)
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => [
-                'required',
-                'string',
-                'email',
-                'max:255',
-                \Illuminate\Validation\Rule::unique(\App\Models\User::class, 'email')->ignore($user->id),
-            ],
-            'role' => ['required', 'in:admin,approver,member'],
-            'permissions' => ['array'],
-            'permissions.*' => ['integer', 'exists:permissions,id'],
-        ]);
+        $data = $request->validated();
 
         $user->forceFill([
             'name' => $data['name'],
@@ -63,9 +52,11 @@ class UserPermissionController extends Controller
             $user->permissions()->sync($data['permissions'] ?? []);
         }
 
-        return redirect()
-            ->route('admin.users.permissions.edit', $user)
-            ->with('success', 'ユーザー情報・ロール・権限を更新しました。');
+        return $this->redirectRouteWithSuccess(
+            'admin.users.permissions.edit',
+            $user,
+            __('admin.flash.user_updated')
+        );
     }
 
 

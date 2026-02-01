@@ -54,7 +54,7 @@ class DailyReportApprovalAndLogTest extends TestCase
         $report = $this->makeSubmittedReport($approver);
         $this->addTimeEntry($report, 60);
 
-        $res = $this->actingAs($approver)->post(route('reports.approve', ['dailyReport' => $report]));
+        $res = $this->actingAs($approver)->post(route('reports.approve', ['report' => $report]));
 
         // 実装によって 403 or 302（エラーメッセージで戻す）
         $this->assertTrue(in_array($res->getStatusCode(), [403, 302], true));
@@ -78,7 +78,7 @@ class DailyReportApprovalAndLogTest extends TestCase
         $report = $this->makeSubmittedReport($member);
         $this->addTimeEntry($report, 60);
 
-        $res = $this->actingAs($approver)->post(route('reports.approve', ['dailyReport' => $report]));
+        $res = $this->actingAs($approver)->post(route('reports.approve', ['report' => $report]));
         $this->assertTrue(in_array($res->getStatusCode(), [302, 200], true));
 
         $report->refresh();
@@ -102,7 +102,7 @@ class DailyReportApprovalAndLogTest extends TestCase
         $report = $this->makeSubmittedReport($member);
         // time_entries を入れない＝合計0
 
-        $res = $this->actingAs($approver)->post(route('reports.approve', ['dailyReport' => $report]));
+        $res = $this->actingAs($approver)->post(route('reports.approve', ['report' => $report]));
         $this->assertTrue(in_array($res->getStatusCode(), [302, 200], true));
 
         $report->refresh();
@@ -123,7 +123,7 @@ class DailyReportApprovalAndLogTest extends TestCase
         $report = $this->makeSubmittedReport($member);
         $this->addTimeEntry($report, 30);
 
-        $res = $this->actingAs($approver)->post(route('reports.reject', ['dailyReport' => $report]), [
+        $res = $this->actingAs($approver)->post(route('reports.reject', ['report' => $report]), [
             'rejection_reason' => '理由テスト',
         ]);
 

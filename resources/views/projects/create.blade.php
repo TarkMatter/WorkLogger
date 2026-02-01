@@ -8,49 +8,19 @@
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    @if ($errors->any())
-                        <div class="mb-4 p-3 border rounded-md">
-                            <ul class="list-disc pl-5">
-                                @foreach ($errors->all() as $e)
-                                    <li>{{ $e }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
+    <x-page-card maxWidth="3xl" bodyClass="p-6 space-y-6">
+                    @include('projects._errors')
 
-                    <form method="POST" action="{{ route('projects.store') }}" class="space-y-4">
+                    <form method="POST" action="{{ route('projects.store') }}" class="space-y-6">
                         @csrf
 
-                        <div>
-                            <label class="text-sm font-semibold text-gray-700" for="name">{{ __('projects.labels.name') }}</label>
-                            <input id="name" name="name" type="text"
-                                   value="{{ old('name') }}"
-                                   required
-                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" />
-                        </div>
+                        @include('projects._form')
 
-                        <div>
-                            <label class="text-sm font-semibold text-gray-700" for="description">{{ __('projects.labels.description') }}</label>
-                            <textarea id="description" name="description" rows="4"
-                                      class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">{{ old('description') }}</textarea>
-                        </div>
-
-                        <div class="flex justify-end gap-2">
-                            <a href="{{ route('projects.index') }}"
-                               class="inline-flex items-center px-4 py-2 border rounded-md bg-white hover:bg-gray-50">
-                                {{ __('common.cancel') }}
-                            </a>
-                            <button class="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700">
-                                {{ __('common.create') }}
-                            </button>
-                        </div>
+                        @include('projects._form_actions', [
+                            'cancelHref' => route('projects.index'),
+                            'submitLabel' => __('common.create'),
+                        ])
                     </form>
-                </div>
-            </div>
-        </div>
-    </div>
+
+    </x-page-card>
 </x-app-layout>

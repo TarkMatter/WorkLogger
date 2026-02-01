@@ -15,7 +15,9 @@
     @else
         <div>
             <div class="text-sm text-gray-500">{{ __('reports.labels.date') }}</div>
-            <div class="text-lg font-semibold">{{ $report->report_date->format('Y-m-d') }}</div>
+            <div class="text-lg font-semibold">
+                <x-datetime :value="$report->report_date" type="date" />
+            </div>
         </div>
     @endif
 

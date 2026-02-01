@@ -215,6 +215,7 @@ return [
         'name' => '名前',
         'email' => 'メールアドレス',
         'password' => 'パスワード',
+        'current_password' => '現在のパスワード',
         'password_confirmation' => 'パスワード（確認）',
         'role' => '権限',
         'report_date' => '日付',

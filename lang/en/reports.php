@@ -3,8 +3,10 @@
 return [
     'title' => 'Daily Reports',
     'create_title' => 'Create Daily Report',
-    'edit_title_with_date' => 'Edit Daily Report (:date)',
-    'show_title_with_date' => 'Daily Report Detail (:date)',
+    // 'edit_title_with_date' => 'Edit Daily Report (:date)',
+    'edit_title' => 'Edit Daily Report',
+    // 'show_title_with_date' => 'Daily Report Detail (:date)',
+    'show_title' => 'Daily Report Detail',
 
     'buttons' => [
         'create_and_edit' => 'Create & Edit',
@@ -88,6 +90,28 @@ return [
         'delete_entry' => 'Delete this time entry?',
         'approve' => 'Approve this report?',
         'reject' => 'Reject this report?',
+    ],
+
+    'validation' => [
+        'report_date_unique' => 'A daily report for this date already exists.',
+    ],
+
+    'errors' => [
+        'cannot_edit_submitted' => 'This report is already submitted and cannot be edited.',
+        'cannot_edit_approved' => 'This report is already approved and cannot be edited.',
+        'cannot_edit' => 'This report cannot be edited.',
+        'submit_only_draft_or_rejected' => 'Only draft or rejected reports can be submitted.',
+        'approve_own' => 'You cannot approve your own report.',
+        'approve_only_submitted' => 'Only submitted reports can be approved.',
+        'approve_zero_minutes' => 'Cannot approve because total minutes are 0. Please reject it.',
+        'approve_over_24h' => 'Cannot approve because total exceeds 24 hours. Please reject it.',
+        'reject_own' => 'You cannot reject your own report.',
+        'reject_only_submitted' => 'Only submitted reports can be rejected.',
+    ],
+
+    'flash' => [
+        'moved_to_next_suffix' => ' (Moved to the next pending report.)',
+        'no_pending_suffix' => ' (No pending reports.)',
     ],
 
     'status' => [

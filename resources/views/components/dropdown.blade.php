@@ -1,4 +1,4 @@
-@props(['align' => 'right', 'width' => '48', 'contentClasses' => 'py-1 bg-white'])
+@props(['align' => 'right', 'width' => '48', 'contentClasses' => 'py-1 bg-white', 'menuClass' => '', 'menuStyle' => '', 'menuWidthPx' => null])
 
 @php
 $alignmentClasses = match ($align) {
@@ -8,9 +8,23 @@ $alignmentClasses = match ($align) {
 };
 
 $width = match ($width) {
+    '36' => 'w-36',
     '48' => 'w-48',
+    '54' => 'w-[13.5rem]',
+    '56' => 'w-56',
+    '100' => 'w-100',
     default => $width,
 };
+
+$menuWidthStyle = '';
+if (isset($menuWidthPx) && $menuWidthPx !== '') {
+    $menuWidthStyle = 'width: ' . (int) $menuWidthPx . 'px;';
+}
+
+$widthClass = $width;
+if ($menuWidthStyle !== '') {
+    $widthClass = '';
+}
 @endphp
 
 <div class="relative" x-data="{ open: false }" @click.outside="open = false" @close.stop="open = false">
@@ -25,8 +39,8 @@ $width = match ($width) {
             x-transition:leave="transition ease-in duration-75"
             x-transition:leave-start="opacity-100 scale-100"
             x-transition:leave-end="opacity-0 scale-95"
-            class="absolute z-50 mt-2 {{ $width }} rounded-md shadow-lg {{ $alignmentClasses }}"
-            style="display: none;"
+            class="absolute z-50 mt-2 {{ $widthClass }} rounded-md shadow-lg {{ $alignmentClasses }} {{ $menuClass }}"
+            style="display: none; {{ $menuWidthStyle }} {{ $menuStyle }}"
             @click="open = false">
         <div class="rounded-md ring-1 ring-black ring-opacity-5 {{ $contentClasses }}">
             {{ $content }}

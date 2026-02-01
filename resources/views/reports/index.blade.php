@@ -10,13 +10,10 @@
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900">
+    <x-page-card maxWidth="7xl" bodyClass="p-6 text-gray-900 space-y-6" cardClass="bg-white overflow-hidden shadow-sm sm:rounded-lg">
 
                     {{-- flash messages --}}
-                    @if (session('success'))
+                    {{-- @if (session('success'))
                         <div class="mb-4 p-3 border rounded-md">
                             {{ session('success') }}
                         </div>
@@ -26,10 +23,10 @@
                         <div class="mb-4 p-3 border rounded-md">
                             {{ session('error') }}
                         </div>
-                    @endif
+                    @endif --}}
 
                     @if ($errors->any())
-                        <div class="mb-4 p-3 border rounded-md">
+                        <div class="p-3 border rounded-md">
                             <ul class="list-disc pl-5">
                                 @foreach ($errors->all() as $e)
                                     <li>{{ $e }}</li>
@@ -38,7 +35,7 @@
                         </div>
                     @endif
 
-                    {{-- tabs --}}
+                    {{-- tabs / filters --}}
                     @php
                         $statusLabels = [
                             'all'       => __('reports.tabs.all'),
@@ -50,8 +47,6 @@
 
                         $current = $status ?? 'all';
 
-                        $count = fn($key) => (int) ($counts[$key] ?? 0);
-
                         $tabs = auth()->user()->canApprove()
                             ? ['submitted', 'all', 'rejected', 'approved']
                             : ['all', 'draft', 'submitted', 'rejected', 'approved'];
@@ -62,246 +57,34 @@
                         $warningCount = (int) ($warningCount ?? 0);
                     @endphp
 
-                    <div class="mb-4 flex flex-wrap gap-2">
-                        @foreach($tabs as $key)
-                            @php
-                                $isActive = $current === $key;
+                    @include('reports._tabs', [
+                        'tabs' => $tabs,
+                        'current' => $current,
+                        'sort' => $sort,
+                        'dir' => $dir,
+                        'warn' => $warn,
+                        'totalCount' => $totalCount,
+                        'counts' => $counts,
+                        'statusLabels' => $statusLabels,
+                    ])
 
-                                // For tabs other than submitted, reset warn filter
-                                $href = route('reports.index', [
-                                    'status' => $key,
-                                    'sort' => $sort,
-                                    'dir' => $dir,
-                                    'warn' => ($key === 'submitted') ? $warn : 'all',
-                                ]);
+                    @include('reports._warnings', [
+                        'current' => $current,
+                        'sort' => $sort,
+                        'dir' => $dir,
+                        'warn' => $warn,
+                        'warningCount' => $warningCount,
+                    ])
 
-                                $badge = $key === 'all' ? (int) $totalCount : $count($key);
-                            @endphp
-
-                            <a href="{{ $href }}"
-                               class="inline-flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm
-                                      {{ $isActive ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 hover:bg-gray-50' }}">
-                                {{ $statusLabels[$key] ?? $key }}
-
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs
-                                             {{ $isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700' }}">
-                                    {{ $badge }}
-                                </span>
-                            </a>
-                        @endforeach
-                    </div>
-
-                    @if(auth()->user()->canApprove() && $current === 'submitted')
-                        <div class="mb-2 text-sm text-gray-500">
-                            {{ __('reports.notes.approver_submitted_hint') }}
-                        </div>
-
-                        <div class="mb-4 flex flex-wrap items-center gap-2">
-                            @php
-                                $baseParams = [
-                                    'status' => 'submitted',
-                                    'sort' => $sort,
-                                    'dir' => $dir,
-                                ];
-
-                                $allHref = route('reports.index', $baseParams + ['warn' => 'all']);
-                                $warnHref = route('reports.index', $baseParams + ['warn' => 'warnings']);
-                            @endphp
-
-                            <a href="{{ $allHref }}"
-                               class="inline-flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm
-                                      {{ $warn === 'all' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 hover:bg-gray-50' }}">
-                                {{ __('reports.warnings.all') }}
-                            </a>
-
-                            <a href="{{ $warnHref }}"
-                               class="inline-flex items-center gap-2 px-3 py-1.5 border rounded-full text-sm
-                                      {{ $warn === 'warnings' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 hover:bg-gray-50' }}">
-                                {{ __('reports.warnings.only') }}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs
-                                             {{ $warn === 'warnings' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700' }}">
-                                    {{ $warningCount }}
-                                </span>
-                            </a>
-
-                            <div class="text-sm text-gray-500">
-                                {{ __('reports.notes.warnings_explain') }}
-                            </div>
-                        </div>
-                    @endif
-
-                    {{-- sort controls (approver only) --}}
-                    @if(auth()->user()->canApprove())
-                        <div class="mb-4 p-3 border rounded-md bg-gray-50">
-                            <form method="GET" action="{{ route('reports.index') }}" class="flex flex-wrap items-center gap-3">
-                                <input type="hidden" name="status" value="{{ $current }}">
-                                <input type="hidden" name="warn" value="{{ ($current === 'submitted') ? $warn : 'all' }}">
-
-                                <div class="flex items-center gap-2">
-                                    <span class="text-sm text-gray-600">{{ __('reports.labels.sort') }}</span>
-                                    <select name="sort" class="border-gray-300 rounded-md shadow-sm text-sm">
-                                        <option value="report_date" @selected($sort === 'report_date')>{{ __('reports.sort.date') }}</option>
-                                        <option value="user_name" @selected($sort === 'user_name')>{{ __('reports.sort.user_name') }}</option>
-                                        <option value="total_minutes" @selected($sort === 'total_minutes')>{{ __('reports.sort.total_minutes') }}</option>
-                                    </select>
-                                </div>
-
-                                <div class="flex items-center gap-2">
-                                    <span class="text-sm text-gray-600">{{ __('reports.labels.order') }}</span>
-                                    <select name="dir" class="border-gray-300 rounded-md shadow-sm text-sm">
-                                        <option value="desc" @selected($dir === 'desc')>{{ __('reports.sort.desc') }}</option>
-                                        <option value="asc" @selected($dir === 'asc')>{{ __('reports.sort.asc') }}</option>
-                                    </select>
-                                </div>
-
-                                <button class="inline-flex items-center px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 text-sm">
-                                    {{ __('common.apply') }}
-                                </button>
-
-                                <a href="{{ route('reports.index', ['status' => $current, 'warn' => ($current === 'submitted') ? $warn : 'all']) }}"
-                                   class="text-sm text-gray-600 hover:underline">
-                                    {{ __('common.reset') }}
-                                </a>
-                            </form>
-                        </div>
-                    @endif
+                    @include('reports._sort', [
+                        'current' => $current,
+                        'warn' => $warn,
+                        'sort' => $sort,
+                        'dir' => $dir,
+                    ])
 
                     {{-- table --}}
-                    @if($reports->count() === 0)
-                        <p>{{ __('reports.empty.reports') }}</p>
-                    @else
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full text-sm">
-                                <thead class="text-left border-b">
-                                    <tr>
-                                        <th class="py-2 pr-4">{{ __('reports.labels.date') }}</th>
-                                        <th class="py-2 pr-4">{{ __('reports.labels.status') }}</th>
-                                        <th class="py-2 pr-4">{{ __('reports.labels.total') }}</th>
-                                        @if(auth()->user()->canApprove())
-                                            <th class="py-2 pr-4">{{ __('reports.labels.user') }}</th>
-                                        @endif
-                                        <th class="py-2 pr-4 text-right">{{ __('reports.labels.operations') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                @foreach($reports as $report)
-                                    @php
-                                        $label = __('reports.status.' . $report->status);
+                    @include('reports._table', ['reports' => $reports])
 
-                                        $total = (int) ($report->total_minutes ?? 0);
-                                        $h = intdiv($total, 60);
-                                        $m = $total % 60;
-
-                                        $warnZero = ($total === 0);
-                                        $warnOver = ($total > 24 * 60);
-
-                                        $isApprover = auth()->user()->canApprove();
-
-                                        $canReview = auth()->user()->can('approve', $report);
-
-                                        $rowHref = $canReview
-                                            ? route('reports.show', $report) . '#approval-panel'
-                                            : route('reports.show', $report);
-
-                                        $rowHover = 'hover:bg-amber-50';
-                                        if ($warnZero) $rowHover = 'hover:bg-red-50';
-                                        if ($warnOver) $rowHover = 'hover:bg-amber-100';
-                                    @endphp
-
-                                    <tr class="border-b {{ $canReview ? $rowHover . ' cursor-pointer' : '' }}"
-                                        @if($canReview)
-                                            role="link"
-                                            tabindex="0"
-                                            onclick="window.location.href={{ json_encode($rowHref) }};"
-                                            onkeydown="if(event.key==='Enter' || event.key===' '){ event.preventDefault(); window.location.href={{ json_encode($rowHref) }}; }"
-                                        @endif
-                                    >
-                                        <td class="py-2 pr-4">
-                                            <a class="text-blue-700 hover:underline"
-                                               href="{{ $rowHref }}"
-                                               onclick="event.stopPropagation();">
-                                                {{ $report->report_date->format('Y-m-d') }}
-                                            </a>
-                                        </td>
-
-                                        <td class="py-2 pr-4">
-                                            {{ $label }}
-
-                                            @if($isApprover && $report->status === 'submitted' && ($warnZero || $warnOver))
-                                                <div class="mt-1 flex flex-wrap gap-2">
-                                                    @if($warnZero)
-                                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs border bg-red-50 text-red-800 border-red-200">
-                                                            {{ __('reports.warnings.badge_zero') }}
-                                                        </span>
-                                                    @endif
-                                                    @if($warnOver)
-                                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs border bg-amber-50 text-amber-900 border-amber-200">
-                                                            {{ __('reports.warnings.badge_over') }}
-                                                        </span>
-                                                    @endif
-                                                </div>
-                                            @endif
-                                        </td>
-
-                                        <td class="py-2 pr-4">
-                                            {{ $h }}h {{ $m }}m
-                                            <span class="text-gray-500">({{ $total }}{{ __('reports.units.minutes') }})</span>
-                                        </td>
-
-                                        @if($isApprover)
-                                            <td class="py-2 pr-4">
-                                                {{ $report->user->name }}
-                                                @if((int)$report->user_id === (int)auth()->id())
-                                                    <span class="ml-2 text-xs text-gray-500">{{ __('reports.misc.self') }}</span>
-                                                @endif
-                                            </td>
-                                        @endif
-
-                                        <td class="py-2 pr-4 text-right">
-                                            @if($isApprover)
-                                                @if($canReview)
-                                                    <a href="{{ $rowHref }}"
-                                                       onclick="event.stopPropagation();"
-                                                       class="inline-flex items-center px-3 py-1.5 border rounded-md bg-gray-800 text-white hover:bg-gray-700">
-                                                        {{ __('reports.buttons.process') }}
-                                                    </a>
-                                                @else
-                                                    <a href="{{ route('reports.show', $report) }}"
-                                                       onclick="event.stopPropagation();"
-                                                       class="text-gray-700 hover:underline">
-                                                        {{ __('reports.buttons.detail') }}
-                                                    </a>
-                                                @endif
-                                            @else
-                                                @can('update', $report)
-                                                    <a class="text-gray-700 hover:underline"
-                                                       href="{{ route('reports.edit', $report) }}"
-                                                       onclick="event.stopPropagation();">
-                                                        {{ __('reports.buttons.edit') }}
-                                                    </a>
-                                                @else
-                                                    <a class="text-gray-700 hover:underline"
-                                                       href="{{ route('reports.show', $report) }}"
-                                                       onclick="event.stopPropagation();">
-                                                        {{ __('reports.buttons.detail') }}
-                                                    </a>
-                                                @endcan
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @endforeach
-
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="mt-4">
-                            {{ $reports->links() }}
-                        </div>
-                    @endif
-
-                </div>
-            </div>
-        </div>
-    </div>
+    </x-page-card>
 </x-app-layout>

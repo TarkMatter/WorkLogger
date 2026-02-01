@@ -3,8 +3,10 @@
 return [
     'title' => '日報',
     'create_title' => '日報 新規作成',
-    'edit_title_with_date' => '日報 編集（:date）',
-    'show_title_with_date' => '日報 詳細（:date）',
+    // 'edit_title_with_date' => '日報 編集（:date）',
+    'edit_title' => '日報 編集',
+    // 'show_title_with_date' => '日報 詳細（:date）',
+    'show_title' => '日報 詳細',
 
     'buttons' => [
         'create_and_edit' => '作成して編集へ',
@@ -88,6 +90,28 @@ return [
         'delete_entry' => 'この工数を削除します。よろしいですか？',
         'approve' => 'この日報を承認します。よろしいですか？',
         'reject' => 'この日報を差戻しします。よろしいですか？',
+    ],
+
+    'validation' => [
+        'report_date_unique' => 'この日付の日報は既に作成されています。',
+    ],
+
+    'errors' => [
+        'cannot_edit_submitted' => 'この日報は提出済みのため編集できません。',
+        'cannot_edit_approved' => 'この日報は承認済みのため編集できません。',
+        'cannot_edit' => 'この日報は編集できません。',
+        'submit_only_draft_or_rejected' => '下書き/差戻しの日報のみ提出できます。',
+        'approve_own' => '自分の日報は承認できません。',
+        'approve_only_submitted' => '提出済みの日報のみ承認できます。',
+        'approve_zero_minutes' => '工数が0分のため承認できません。差戻ししてください。',
+        'approve_over_24h' => '合計工数が24時間を超えているため承認できません。差戻ししてください。',
+        'reject_own' => '自分の日報は差戻しできません。',
+        'reject_only_submitted' => '提出済みの日報のみ差戻しできます。',
+    ],
+
+    'flash' => [
+        'moved_to_next_suffix' => '（次の承認待ちへ移動しました）',
+        'no_pending_suffix' => '（承認待ちはもうありません）',
     ],
 
     'status' => [

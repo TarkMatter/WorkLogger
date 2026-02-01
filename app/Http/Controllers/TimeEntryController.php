@@ -6,11 +6,12 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 use App\Models\DailyReport;
 use App\Models\TimeEntry;
+use App\Http\Requests\StoreTimeEntryRequest;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class TimeEntryController extends Controller
 {
+    // フラッシュは共通ヘルパで統一。
     use AuthorizesRequests;
 
     /**
@@ -32,32 +33,25 @@ class TimeEntryController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(\Illuminate\Http\Request $request, \App\Models\DailyReport $dailyReport)
+    public function store(StoreTimeEntryRequest $request, \App\Models\DailyReport $report)
     {
         // 日報の編集権限がある人だけが工数を追加できる
-        $this->authorize('update', $dailyReport);
+        $this->authorize('update', $report);
 
-        $data = $request->validate([
-            'project_id' => [
-                'required',
-                'integer',
-                // projects は全体共有：user_idで絞らない
-                \Illuminate\Validation\Rule::exists('projects', 'id'),
-            ],
-            'minutes' => ['required', 'integer', 'min:0', 'max:1440'],
-            'task' => ['nullable', 'string', 'max:255'],
-        ]);
+        $data = $request->validated();
 
         $entry = new \App\Models\TimeEntry();
-        $entry->dailyReport()->associate($dailyReport);
+        $entry->dailyReport()->associate($report);
         $entry->project_id = $data['project_id'];
         $entry->minutes = $data['minutes'];
         $entry->task = $data['task'] ?? null;
         $entry->save();
 
-        return redirect()
-            ->route('reports.edit', $dailyReport)
-            ->with('success', '工数を追加しました。');
+        return $this->redirectRouteWithSuccess(
+            'reports.edit',
+            $report,
+            __('flash.created', ['item' => __('models.time_entry')])
+        );
     }
 
 
@@ -88,16 +82,16 @@ class TimeEntryController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Request $request, DailyReport $dailyReport, TimeEntry $entry)
+    public function destroy(Request $request, DailyReport $report, TimeEntry $entry)
     {
-        $this->authorize('update', $dailyReport);
+        $this->authorize('update', $report);
 
         // URLで別の日報のentryを消せないようにする
-        abort_if($entry->daily_report_id !== $dailyReport->id, 404);
+        abort_if($entry->daily_report_id !== $report->id, 404);
 
         $entry->delete();
 
-        return redirect()->route('reports.edit', $dailyReport);
+        return redirect()->route('reports.edit', $report);
 
     }
 }

@@ -1,23 +1,66 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
-use \App\Http\Controllers\ProjectController;
-
 use App\Http\Controllers\Admin\UserPermissionController;
+use App\Http\Controllers\DailyReportController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\TimeEntryController;
+use App\Models\DailyReport;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\Rule;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
+Route::get('/dashboard', function (Request $request) {
+    $user = $request->user();
+
+    $pendingApprovals = collect();
+    $pendingApprovalsCount = 0;
+
+    if ($user->canApprove()) {
+        $pendingBase = DailyReport::query()
+            ->where('status', 'submitted')
+            ->where('user_id', '!=', $user->id);
+
+        $pendingApprovalsCount = (clone $pendingBase)->count();
+        $pendingApprovals = $pendingBase
+            ->with('user')
+            ->withSum('timeEntries as total_minutes', 'minutes')
+            ->orderByDesc('report_date')
+            ->orderByDesc('id')
+            ->limit(5)
+            ->get();
+    }
+
+    $rejectedBase = DailyReport::query()
+        ->where('status', 'rejected')
+        ->where('user_id', $user->id);
+
+    $rejectedReportsCount = (clone $rejectedBase)->count();
+    $rejectedReports = $rejectedBase
+        ->withSum('timeEntries as total_minutes', 'minutes')
+        ->orderByDesc('report_date')
+        ->orderByDesc('id')
+        ->limit(5)
+        ->get();
+
+    return view('dashboard', compact(
+        'pendingApprovals',
+        'pendingApprovalsCount',
+        'rejectedReports',
+        'rejectedReportsCount'
+    ));
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::post('/locale', function (Request $request) {
+    // 対応言語を取得（['ja', 'en'] は取得できなかった場合の保険）
+    $supported = config('locales.supported', ['ja', 'en']);
+
     $data = $request->validate([
-        'locale' => ['required', 'in:ja,en'],
+        'locale' => ['required', Rule::in($supported)],
     ]);
 
     session(['locale' => $data['locale']]);
@@ -25,77 +68,38 @@ Route::post('/locale', function (Request $request) {
     return back()->withCookie(cookie()->forever('locale', $data['locale']));
 })->name('locale.set');
 
-
 Route::middleware('auth')->group(function () {
+    // 認証ユーザーの基本設定
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-
-    Route::prefix('admin')->name('admin.')->middleware(['auth', 'can:manage-user-permissions'])->group(function () {
-    Route::get('users', [UserPermissionController::class, 'index'])->name('users.index');
-    Route::get('users/{user}/permissions', [UserPermissionController::class, 'edit'])->name('users.permissions.edit');
-    Route::put('users/{user}/permissions', [UserPermissionController::class, 'update'])->name('users.permissions.update');
-});
-    // --------------------------------------------------
-    //　案件のCRUD
-
-    Route::middleware(['auth'])->group(function () {
-
-        // 一覧
-        Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
-
-        // adminのみ（作成）
-        Route::middleware('can:create,App\Models\Project')->group(function () {
-            Route::get('/projects/create', [ProjectController::class, 'create'])->name('projects.create');
-            Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
+    // 管理者向けの権限管理
+    Route::prefix('admin')
+        ->name('admin.')
+        ->middleware('can:manage-user-permissions')
+        ->group(function () {
+            Route::get('users', [UserPermissionController::class, 'index'])->name('users.index');
+            Route::get('users/{user}/permissions', [UserPermissionController::class, 'edit'])->name('users.permissions.edit');
+            Route::put('users/{user}/permissions', [UserPermissionController::class, 'update'])->name('users.permissions.update');
         });
 
-        // adminのみ（編集）
-        Route::middleware('can:update,project')->group(function () {
-            Route::get('/projects/{project}/edit', [ProjectController::class, 'edit'])->name('projects.edit');
-            Route::put('/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
-        });
+    // 案件のCRUD
+    Route::resource('projects', ProjectController::class);
 
-        // adminのみ（削除）
-        Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])
-            ->middleware('can:delete,project')
-            ->name('projects.destroy');
-
-        // 詳細（← これが最後！）
-        Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
-    });
-
-    // Route::middleware(['auth'])->group(function () {
-    //     Route::resource('projects', \App\Http\Controllers\ProjectController::class);
-    // });
-
-    // Route::resource('projects', \App\Http\Controllers\ProjectController::class);
-
-    // --------------------------------------------------
     // 日報のCRUD
-    Route::resource('reports', \App\Http\Controllers\DailyReportController::class);
-    
-    // 日報の提出
-    Route::post('reports/{dailyReport}/submit', [\App\Http\Controllers\DailyReportController::class, 'submit'])
-        ->name('reports.submit');
+    Route::resource('reports', DailyReportController::class);
 
-    // 日報の承認
-    Route::post('reports/{dailyReport}/approve', [\App\Http\Controllers\DailyReportController::class, 'approve'])
-    ->name('reports.approve');
+    Route::prefix('reports/{report}')->name('reports.')->group(function () {
+        // 日報の提出/承認/差し戻し
+        Route::post('submit', [DailyReportController::class, 'submit'])->name('submit');
+        Route::post('approve', [DailyReportController::class, 'approve'])->name('approve');
+        Route::post('reject', [DailyReportController::class, 'reject'])->name('reject');
 
-    // 日報の差し戻し
-    Route::post('reports/{dailyReport}/reject', [\App\Http\Controllers\DailyReportController::class, 'reject'])
-        ->name('reports.reject');
-
-    // --------------------------------------------------
-    // 工数の追加
-    Route::post('reports/{dailyReport}/entries', [\App\Http\Controllers\TimeEntryController::class, 'store'])
-        ->name('reports.entries.store');
-    
-    // 工数の削除
-    Route::delete('reports/{dailyReport}/entries/{entry}', [\App\Http\Controllers\TimeEntryController::class, 'destroy'])
-        ->name('reports.entries.destroy');
+        // 工数の追加/削除
+        Route::post('entries', [TimeEntryController::class, 'store'])->name('entries.store');
+        Route::delete('entries/{entry}', [TimeEntryController::class, 'destroy'])->name('entries.destroy');
+    });
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

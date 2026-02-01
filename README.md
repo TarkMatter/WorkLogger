@@ -1,59 +1,90 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 日報管理システム 要件定義
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## 1. 目的・背景
+- 日報作成/提出/承認を一元管理し、案件別の工数を把握できること。
+- 権限に応じた操作制御を実現すること。
+- 日本語/英語の多言語対応を行うこと。
 
-## About Laravel
+## 2. ユーザー種別
+- **一般ユーザー（member）**
+  - 自分の日報の作成・編集・提出・閲覧
+  - 自分の日報の差戻し対応
+- **承認者（approver）**
+  - 承認待ち日報の閲覧・承認・差戻し
+  - 自分の日報は承認不可（職務分離）
+- **管理者（admin）**
+  - 全機能に加え、ユーザー権限の管理
+  - 案件権限の付与
+  - 新規ユーザー登録
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 3. 認証・登録
+- ログイン/ログアウト、パスワード再設定、メール検証を備える。
+- **新規登録は admin 権限のみ**が実行可能。
+- 登録画面への遷移は admin 画面（ユーザー一覧）からのみ。
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 4. 画面・UI要件
+- 共通レイアウト（app/guest）を使用し、構造を部分テンプレート化。
+- テーブルは横・縦の余白を広めに設定（`border-separate`, `border-spacing` を使用）。
+- ナビゲーションのロゴは「日報管理」のテキスト表示。
+- welcome/login はグラデーション背景＋カードUI。
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## 5. 多言語対応
+- 日本語/英語を切り替え可能（言語ドロップダウン/セッション・Cookie保持）。
+- 翻訳キーは `lang/ja`, `lang/en` に整備。
+- バリデーション属性名（`validation.attributes.*`）も両言語で定義。
 
-## Learning Laravel
+## 6. 機能要件
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### 6.1 案件管理（Projects）
+- 一覧/詳細/作成/更新/削除（CRUD）。
+- **作成・更新・削除は権限（Permission）で制御**。
+- 削除時：工数が紐づく案件は削除不可。
+- 一覧はページネーション（15件）。
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### 6.2 日報管理（Daily Reports）
+- 一覧/詳細/作成/更新/削除（CRUD）。
+- ステータス：`draft` / `submitted` / `approved` / `rejected`。
+- 提出/承認/差戻しの状態遷移を提供。
+- **承認者の一覧**はデフォルトで `submitted` を表示。
+- 一覧の絞り込み：
+  - ステータス
+  - 警告（0分/24時間超）
+  - 並び替え（date / user / total）
+- 承認者以外は自分の日報のみ閲覧可能。
+- 承認者は自分の日報の承認/差戻し不可。
+- 差戻し理由を必須入力。
 
-## Laravel Sponsors
+### 6.3 工数（Time Entries）
+- 日報に工数を追加/削除可能。
+- **工数追加は日報編集権限があるユーザーのみ**。
+- 工数合計は日報詳細・一覧で表示。
+- 0分/24時間超の警告を承認者に表示。
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### 6.4 ダッシュボード
+- 承認者向け：承認待ち日報の件数と最新一覧（最大5件）を表示。
+- 一般ユーザー向け：差戻し日報の件数と最新一覧（最大5件）を表示。
+- 一覧から承認画面/編集画面へのリンクを提供。
 
-### Premium Partners
+### 6.5 権限管理（Admin）
+- 管理者専用のユーザー一覧・権限編集画面。
+- ユーザー情報（氏名・メール・ロール）編集。
+- 権限（Permission）をグループごとに一括ON/OFF。
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## 7. バリデーション/メッセージ
+- 日報作成：同一ユーザーの同日重複作成不可。
+- 工数：分は0〜1440の範囲。
+- エラーメッセージは `flash` / `validation` 翻訳で統一。
 
-## Contributing
+## 8. ルーティング方針
+- `/projects`、`/reports` を resource で管理。
+- 追加操作は `reports/{report}/submit|approve|reject|entries`。
+- `register` は `can:manage-user-permissions` 付き。
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## 9. 非機能要件
+- UIの整合性：各画面の余白・見やすさを統一。
+- テスト：Feature/Unit テストを整備し、`sail test` で全パス。
 
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## 10. 将来拡張の余地（任意）
+- 権限グループの追加（reports/entries/other）
+- 承認フローの段階化
+- ダッシュボードの通知強化
